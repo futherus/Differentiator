@@ -37,7 +37,7 @@ int main()
     ASSERT_RET$(!ferror(instream), DIFFTOR_READ_FAIL);
     
     Tree tree = {};
-    tree_dump_init(nullptr);
+    tree_dump_init(dumpsystem_get_stream(log));
     tree_tex_init();
 
     parse(&tree, buffer);

@@ -53,7 +53,7 @@ const int DUMPSYSTEM_DEFAULT_STREAM = 1;
         {                                                                             \
             fprintf(stream__, "<span class = \"title\"> LOG: \"" MESSAGE__ "\"\n"     \
                             "at %s:%d:%s</span>\n",                                   \
-                    __VA_ARGS__, __FILE__, __LINE__, __PRETTY_FUNCTION__);            \
+                    ##__VA_ARGS__, __FILE__, __LINE__, __PRETTY_FUNCTION__);          \
             fflush(stream__);                                                         \
         }                                                                             \
     }                                                                                 \

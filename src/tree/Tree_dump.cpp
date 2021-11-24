@@ -349,7 +349,7 @@ static void close_texfile_()
     if(fclose(TEX_STREAM) != 0)
         perror("Tree tex file can't be succesfully closed");
 
-    char sys_cmd[FILENAME_MAX] = "pdflatex ";
+    char sys_cmd[FILENAME_MAX] = "pdflatex -quiet -aux-directory=tree_dump -job-name=tex_dump ";
     strcat(sys_cmd, TEX_TEMP_FILE);
 
     system(sys_cmd);
