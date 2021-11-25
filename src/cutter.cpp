@@ -1,100 +1,112 @@
-
-#include "tree/Tree.h"
-#include "cutter.h"
-
 #include <math.h>
 #include <assert.h>
 
-static int CONST_EVAL_STATE = 0;
+#include "tree/Tree.h"
+#include "cutter.h"
+#include "dumpsystem/dumpsystem.h"
+
+static int OPT_STATE = 0;
 
 #define IF_NUM(NUM, LEX) if((LEX).type == LEXT_IMMCONST && (LEX).value.num == (NUM))
 
 static void cut_add_(Node** node)
 {
+    assert(node);
+
     IF_NUM(0, (*node)->left->lex)
     {
         *node = (*node)->right;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 
     IF_NUM(0, (*node)->right->lex)
     {
         *node = (*node)->left;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 }
 
 static void cut_sub_(Node** node)
 {
+    assert(node);
+    
     IF_NUM(0, (*node)->right->lex)
     {
         *node = (*node)->left;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
     }
 }
 
 static void cut_mul_(Node** node)
 {
+    assert(node);
+
     IF_NUM(0, (*node)->right->lex)
     {
         *node = (*node)->right;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 
     IF_NUM(0, (*node)->left->lex)
     {
         *node = (*node)->left;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 
     IF_NUM(1, (*node)->right->lex)
     {
         *node = (*node)->left;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 
     IF_NUM(1, (*node)->left->lex)
     {
         *node = (*node)->right;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 }
 
 static void cut_div_(Node** node)
 {
+    assert(node);
+
     IF_NUM(1, (*node)->right->lex)
     {
         *node = (*node)->right;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
     }
 }
 
 static void cut_pow_(Node** node)
 {
+    assert(node);
+
     IF_NUM(0, (*node)->right->lex)
     {
         *node = (*node)->right;
         (*node)->lex.value.num = 1;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 
     IF_NUM(1, (*node)->right->lex)
     {
         *node = (*node)->left;
-        CONST_EVAL_STATE = 1;
+        OPT_STATE = 1;
         return;
     }
 }
 
 static void cut_zero_one_(Node** node)
 {
+    assert(node);
+
     if((*node)->left)
         cut_zero_one_(&(*node)->left);
         
@@ -126,6 +138,8 @@ static void cut_zero_one_(Node** node)
 
 static void evaluate_operator_(Node* node)
 {
+    assert(node);
+
     if(node->left->lex.type != LEXT_IMMCONST || node->right->lex.type != LEXT_IMMCONST)
         return;
 
@@ -158,11 +172,13 @@ static void evaluate_operator_(Node* node)
     node->right = nullptr;
     node->lex.type      = LEXT_IMMCONST;
     node->lex.value.num = result;
-    CONST_EVAL_STATE = 1;
+    OPT_STATE = 1;
 }
 
 static void evaluate_function_(Node* node)
 {
+    assert(node);
+
     if(node->left->lex.type != LEXT_IMMCONST)
         return;
     
@@ -184,11 +200,13 @@ static void evaluate_function_(Node* node)
     node->right = nullptr;
     node->lex.type      = LEXT_IMMCONST;
     node->lex.value.num = result;
-    CONST_EVAL_STATE = 1;
+    OPT_STATE = 1;
 }
 
 static void const_evaluation_(Node* node)
 {
+    assert(node);
+
     if(node->left)
         const_evaluation_(node->left);
     
@@ -208,27 +226,14 @@ static void const_evaluation_(Node* node)
     }
 }
 
-разность одинаковых деревьев
-
-расставление скобочек
-
-замены
-
-копирование узлов
-
-частная производная
-
-подстановка параметра
-
-н-арное дерево
-
 void cutter(Tree* tree)
 {
-    CONST_EVAL_STATE = 1;
 
-    while(CONST_EVAL_STATE)
+    OPT_STATE = 1;
+
+    while(OPT_STATE)
     {
-        CONST_EVAL_STATE = 0;
+        OPT_STATE = 0;
         const_evaluation_(tree->root);
         cut_zero_one_(&tree->root);
     }

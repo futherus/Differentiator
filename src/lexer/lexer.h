@@ -3,6 +3,17 @@
 
 #include <stdint.h>
 
+enum lexer_err
+{
+    LEXER_NOERR = 0,
+    LEXER_PASS_ERR = 1,
+    LEXER_NULLPTR = 2,
+    LEXER_STACK_FAIL = 3,
+    LEXER_ARRAY_FAIL = 4,
+    LEXER_UNKNWN_SYMB = 5,
+    LEXER_NOTFOUND = 6,
+};
+
 enum Lexem_type
 {
     LEXT_NOTYPE   = 0,
@@ -41,12 +52,12 @@ struct Lexem
     } value;
 };
 
-int lexer(char* txt);
+lexer_err lexer(char* txt);
 
-int consume(Lexem* lex);
+lexer_err consume(Lexem* lex);
 
-int peek(Lexem* lex);
+lexer_err peek(Lexem* lex);
 
-char* demangle(Lexem lex);
+char* demangle(const Lexem* lex);
 
 #endif // LEXER_H

@@ -1,12 +1,13 @@
+#include <stdlib.h>
+#include <sys/stat.h>
+
 #include "tree/Tree.h"
 #include "lexer/lexer.h"
 #include "derivative.h"
 #include "parser.h"
 #include "dumpsystem/dumpsystem.h"
 #include "cutter.h"
-
-#include <stdlib.h>
-#include <sys/stat.h>
+#include "article.h"
 
 static int file_sz_(const char filename[], size_t* sz)
 {

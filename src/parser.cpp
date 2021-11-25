@@ -1,18 +1,20 @@
-#include "parser.h"
-#include "dumpsystem/dumpsystem.h"
-
 #include <assert.h>
 #include <stdio.h>
 
+#include "parser.h"
+#include "dumpsystem/dumpsystem.h"
+
 static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
 {
+    assert(tree && node_ptr);
+
     Lexem lex = {};
     Lexem_code expctd = LEX_NOCODE;
 
-    tree_add(tree, node_ptr, lex);
+    ASSERT_RET$(!tree_add(tree, node_ptr, &lex), PARSER_TREE_FAIL);
 
-    ASSERT_RET$(!consume(&lex), PARSER_BAD_FORMAT);
-    ASSERT_RET$(lex.type == LEXT_PAREN, PARSER_BAD_FORMAT);
+    PASS$(!consume(&lex),        return PARSER_LEXER_FAIL; );
+    ASSERT_RET$(lex.type == LEXT_PAREN, PARSER_MISS_PAREN; );
 
     switch(lex.value.code)
     {
@@ -23,37 +25,37 @@ static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
             expctd = LEX_RQPAR;
             break;
         default:
-            assert(0);
+            ASSERT$(0, PARSER_FLTHRGH, assert(0); );
     }
     
-    ASSERT_RET$(!peek(&lex), PARSER_BAD_FORMAT);
+    PASS$(!peek(&lex), return PARSER_LEXER_FAIL; );
 
     switch(lex.type)
     {
         case LEXT_PAREN:
-            parse_lexem_(tree, &(*node_ptr)->left);
+            PASS$(!parse_lexem_(tree, &(*node_ptr)->left),   return PARSER_PASS_ERR;   );
 
-            consume(&(*node_ptr)->lex);
+            PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
 
-            parse_lexem_(tree, &(*node_ptr)->right);
+            PASS$(!parse_lexem_(tree, &(*node_ptr)->right),  return PARSER_PASS_ERR;   );
             
             break;
         case LEXT_IMMCONST : case LEXT_VAR :
-            consume(&(*node_ptr)->lex);
+            PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
             
             break;
         case LEXT_FUNC:
-            consume(&(*node_ptr)->lex);
+            PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
 
-            parse_lexem_(tree, &(*node_ptr)->left);
+            PASS$(!parse_lexem_(tree, &(*node_ptr)->left),   return PARSER_PASS_ERR;   );
 
             break;
         default: case LEXT_NOTYPE :
-            assert(0);
+            ASSERT$(0, PARSER_FLTHRGH, assert(0); );
     }
 
-    ASSERT_RET$(!consume(&lex), PARSER_BAD_FORMAT);
-    ASSERT_RET$(lex.type == LEXT_PAREN && lex.value.code == expctd, PARSER_BAD_FORMAT);
+    PASS$(!consume(&lex),                                    return PARSER_LEXER_FAIL; );
+    ASSERT_RET$(lex.type == LEXT_PAREN && lex.value.code == expctd, PARSER_MISS_PAREN; );
 
     return PARSER_NOERR;
 }
@@ -62,9 +64,9 @@ parser_err parse(Tree* tree, char* data)
 {
     assert(tree && data);
 
-    ASSERT_RET$(!lexer(data), PARSER_BAD_DATA);
+    PASS$(!lexer(data), return PARSER_LEXER_FAIL; );
 
-    PASS$(!parse_lexem_(tree, &tree->root), return PARSER_BAD_FORMAT; );
+    PASS$(!parse_lexem_(tree, &tree->root), return PARSER_PASS_ERR; );
 
     return PARSER_NOERR;
 }

@@ -1,13 +1,9 @@
-#include "Tree.h"
-#include "../dumpsystem/dumpsystem.h"
-
-#ifndef __USE_MINGW_ANSI_STDIO
-#define __USE_MINGW_ANSI_STDIO 1
-#endif
-#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
+#include "Tree.h"
+#include "../dumpsystem/dumpsystem.h"
 
 #define ASSERT(CONDITION, ERROR)                \
     do                                          \
@@ -17,6 +13,13 @@
             tree_dump(tree, #ERROR, (ERROR));   \
             return (ERROR);                     \
         }                                       \
+    } while(0)                                  \
+
+#define PASS(CONDITION, ERROR)                  \
+    do                                          \
+    {                                           \
+        if(!(CONDITION))                        \
+            return (ERROR);                     \
     } while(0)                                  \
 
 static tree_err ptr_arr_resize_(Tree* tree)
@@ -43,8 +46,7 @@ static tree_err add_chunk_(Tree* tree)
     assert(tree);
 
     if(tree->cap / TREE_CHUNK_SIZE == tree->ptr_arr_cap)
-        if(ptr_arr_resize_(tree))
-            return TREE_BAD_ALLOC;
+        PASS(!ptr_arr_resize_(tree), TREE_BAD_ALLOC);
     
     Node* temp = (Node*) calloc(TREE_CHUNK_SIZE, sizeof(Node));
     ASSERT(temp, TREE_BAD_ALLOC);
@@ -66,16 +68,15 @@ tree_err tree_dstr(Tree* tree)
     return TREE_NOERR;
 }
 
-tree_err tree_add(Tree* tree, Node** base_ptr, Lexem data)
+tree_err tree_add(Tree* tree, Node** base_ptr, const Lexem* data)
 {
-    ASSERT(tree && base_ptr, TREE_NULLPTR);
+    ASSERT(tree && base_ptr && data, TREE_NULLPTR);
 
     if(tree->cap == tree->size)
-        if(add_chunk_(tree))
-            return TREE_BAD_ALLOC;
+        PASS(!add_chunk_(tree), TREE_BAD_ALLOC);
 
     Node* new_node = &tree->ptr_arr[tree->size / TREE_CHUNK_SIZE][tree->size % TREE_CHUNK_SIZE];
-    *new_node  = {data, nullptr, nullptr};
+    *new_node  = {*data, nullptr, nullptr};
     *base_ptr  = new_node;
 
     tree->size++;
@@ -88,6 +89,8 @@ static size_t VISITOR_DEPTH_ = -1;
 
 static void tree_visitor_(Node* node)
 {
+    assert(node);
+
     VISITOR_DEPTH_++;    
 
     VISITOR_FUNCTION_(node, VISITOR_DEPTH_);
@@ -113,38 +116,3 @@ tree_err tree_visitor(Tree* tree, void (*function)(Node* node, size_t depth))
 
     return TREE_NOERR;
 }
-
-/*
-static Stack* PATH_STACK = nullptr;
-static bool tree_find_(Node* node, const char data[])
-{
-    stack_push(PATH_STACK, node);
-
-    if(strcmp(node->data, data) == 0)
-        return true;
-    
-    if(node->left)
-        if(tree_find_(node->left, data))
-            return true;
-    
-    if(node->right)
-        if(tree_find_(node->right, data))
-            return true;
-
-    void* temp = nullptr;
-    stack_pop(PATH_STACK, &temp);
-
-    return false;
-}
-
-tree_err tree_find(Tree* tree, const char data[], Stack* path_stk)
-{
-    ASSERT(tree && data && path_stk, TREE_NULLPTR);
-
-    PATH_STACK = path_stk;
-
-    tree_find_(tree->root, data);
-
-    return TREE_NOERR;
-}
-*/

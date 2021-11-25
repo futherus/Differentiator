@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+
 #include "../lexer/lexer.h"
 #include "../stack/include/Stack.h"
 
@@ -40,15 +41,12 @@ enum tree_err
 
 tree_err tree_dstr(Tree* tree);
 
-tree_err tree_add(Tree* tree, Node** base_ptr, Lexem data);
+tree_err tree_add(Tree* tree, Node** base_ptr, const Lexem* data);
 
 tree_err tree_visitor(Tree* tree, void (*function)(Node* node, size_t depth));
-//tree_err tree_find(Tree* tree, const char data[], Stack* path_stk);
 
 void     tree_dump_init(FILE* dumpstream);
-void     tree_tex_init();
 
 void     tree_dump(Tree* tree, const char msg[], tree_err errcode = TREE_NOERR);
-void     tree_tex_dump(Tree* tree);
 
 #endif // TREE_H

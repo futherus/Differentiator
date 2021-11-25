@@ -1,7 +1,8 @@
-#include "dumpsystem.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include "dumpsystem.h"
 
 static const size_t TXT_TIME_CAP   = 512;
 static const size_t DUMPSTREAM_CAP = 16;
