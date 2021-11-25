@@ -7,7 +7,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-                typedef void* Elem_t;
+                typedef uint64_t Elem_t;
 
                 /// Path to file for logs (can be replaced using stack_dump_set_stream)
                 const char STACK_DUMPFILE[] = "stack_log.html";

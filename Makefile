@@ -5,9 +5,9 @@ SRCFLDR := src/
 OBJFLDR := obj/
 BINFLDR := bin/
 
-VPATH = $(SRCFLDR) $(OBJFLDR) $(SRCFLDR)/dumpsystem $(SRCFLDR)/tree $(SRCFLDR)/stack
+VPATH = $(SRCFLDR) $(OBJFLDR) $(SRCFLDR)/dumpsystem $(SRCFLDR)/tree $(SRCFLDR)/stack $(SRCFLDR)/lexer
 
-SRC := main.cpp lexer.cpp parser.cpp Tree.cpp Tree_dump.cpp dumpsystem.cpp Stack.cpp stack_hash.cpp dump.cpp
+SRC := main.cpp lexer.cpp Array.cpp parser.cpp derivative.cpp cutter.cpp Tree.cpp Tree_dump.cpp dumpsystem.cpp Stack.cpp stack_hash.cpp dump.cpp 
 OBJ := $(SRC:.cpp=.o)
 LIB := iconv
 TARGET := $(BINFLDR)/Differentiator.exe

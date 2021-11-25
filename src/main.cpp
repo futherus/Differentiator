@@ -1,7 +1,9 @@
 #include "tree/Tree.h"
-#include "lexer.h"
+#include "lexer/lexer.h"
+#include "derivative.h"
 #include "parser.h"
 #include "dumpsystem/dumpsystem.h"
+#include "cutter.h"
 
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -41,9 +43,17 @@ int main()
     tree_tex_init();
 
     parse(&tree, buffer);
-
-    tree_dump(&tree, "dump");
     tree_tex_dump(&tree);
+    Tree derived_tree = {};
+
+    derivate(&derived_tree, &tree);
+
+    tree_dump(&derived_tree, "dump");
+    
+    cutter(&derived_tree);
+
+    tree_dump(&derived_tree, "dump");
+    tree_tex_dump(&derived_tree);
 
     return 0;
 }

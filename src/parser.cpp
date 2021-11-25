@@ -9,13 +9,7 @@ static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
     Lexem lex = {};
     Lexem_code expctd = LEX_NOCODE;
 
-    if(!tree->root)
-    {
-        tree_init(tree, lex);
-        node_ptr = &tree->root;
-    }
-    else
-        tree_add(tree, node_ptr, lex);
+    tree_add(tree, node_ptr, lex);
 
     ASSERT_RET$(!consume(&lex), PARSER_BAD_FORMAT);
     ASSERT_RET$(lex.type == LEXT_PAREN, PARSER_BAD_FORMAT);
@@ -46,9 +40,15 @@ static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
             break;
         case LEXT_IMMCONST : case LEXT_VAR :
             consume(&(*node_ptr)->lex);
+            
+            break;
+        case LEXT_FUNC:
+            consume(&(*node_ptr)->lex);
+
+            parse_lexem_(tree, &(*node_ptr)->left);
 
             break;
-        default:
+        default: case LEXT_NOTYPE :
             assert(0);
     }
 
@@ -64,7 +64,7 @@ parser_err parse(Tree* tree, char* data)
 
     ASSERT_RET$(!lexer(data), PARSER_BAD_DATA);
 
-    PASS$(!parse_lexem_(tree, nullptr), return PARSER_BAD_FORMAT; );
+    PASS$(!parse_lexem_(tree, &tree->root), return PARSER_BAD_FORMAT; );
 
     return PARSER_NOERR;
 }

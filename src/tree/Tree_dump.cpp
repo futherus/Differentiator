@@ -26,7 +26,8 @@ R"(
 digraph G{
     graph [dpi = 100];
     bgcolor = "#2F353B";
-    ranksep = 1;
+    ranksep = 0.5;
+    nodesep = 0.5;
     edge[minlen = 3, arrowsize = 2, penwidth = 1.5, color = green];
     node[shape = rectangle, style = "filled, rounded", fillcolor = "#C5D0E6", fontsize = 30,
          color = "#C5D0E6", penwidth = 3];
@@ -46,20 +47,7 @@ static void tree_print_node_(Node* node, size_t depth)
 {
     FILE* stream = TEMP_GRAPH_STREAM;
 
-    switch(node->lex.type)
-    {
-        case LEXT_OP:
-            PRINT("node%p[label = \"%c\"]", node, node->lex.value.code);
-            break;
-        case LEXT_IMMCONST:
-            PRINT("node%p[label = \"%lg\"]", node, node->lex.value.num);
-            break;
-        case LEXT_VAR:
-            PRINT("node%p[label = \"%s\"]", node, node->lex.value.name);
-            break;
-        default:
-            assert(0);
-    }
+    PRINT("node%p[label = \"%s\"]", node, demangle(node->lex));
 
     if(node->left  != nullptr)
         PRINT("node%p -> node%p;\n", node, node->left);
@@ -174,7 +162,7 @@ void tree_dump(Tree* tree, const char msg[], tree_err errcode)
 
     tree_graph_dump_(tree);
 
-    PRINT(R"(<img src = ")" "%s" R"(" alt = "Graphical dump" width = 1080>)", graphviz_png_());
+    PRINT(R"(<img src = ")" "%s" R"(" alt = "Graphical dump" height = 1080>)", graphviz_png_());
 
     PRINT("<span class = \"title\">\n\n----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n</span>");
 }
@@ -217,7 +205,7 @@ static int get_priority_(Node* check)
             return 1;
         case LEX_MUL : case LEX_DIV :
             return 2;
-        case LEX_POWER:
+        case LEX_POW:
             return 3;
         default:
         { /*fallthrough*/ }
@@ -255,7 +243,7 @@ static void tree_tex_node_(Node* node, Node* parent)
                 case LEX_MUL:
                     PRINT(" \\cdot ");
                     break;
-                case LEX_POWER:
+                case LEX_POW:
                     PRINT(" ^{");
                     break;
                 default:
@@ -267,7 +255,7 @@ static void tree_tex_node_(Node* node, Node* parent)
 
             switch(node->lex.value.code)
             {
-                case LEX_DIV : case LEX_POWER :
+                case LEX_DIV : case LEX_POW :
                     PRINT("} ");
                     break;
                 default:
@@ -278,14 +266,15 @@ static void tree_tex_node_(Node* node, Node* parent)
                 PRINT(")");
 
             break;
-        case LEXT_IMMCONST:
-            PRINT(" %lg ", node->lex.value.num);
-            break;
-        case LEXT_VAR:
-            PRINT(" %s ", node->lex.value.name);
+        case LEXT_FUNC:
+            PRINT("%s(", demangle(node->lex));
+
+            tree_tex_node_(node->left, node);
+            
+            PRINT(")");
             break;
         default:
-            assert(0);
+            PRINT("%s", demangle(node->lex));
     }
 }
 

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "../lexer.h"
+#include "../lexer/lexer.h"
 #include "../stack/include/Stack.h"
 
 const ptrdiff_t TREE_PTR_ARR_MIN_CAP = 8;
@@ -38,7 +38,6 @@ enum tree_err
     TREE_STACK_FAIL = 5,
 };
 
-tree_err tree_init(Tree* tree, Lexem root_data);
 tree_err tree_dstr(Tree* tree);
 
 tree_err tree_add(Tree* tree, Node** base_ptr, Lexem data);

@@ -55,21 +55,6 @@ static tree_err add_chunk_(Tree* tree)
     return TREE_NOERR;
 }
 
-tree_err tree_init(Tree* tree, Lexem root_data)
-{
-    ASSERT(tree, TREE_NULLPTR);
-    ASSERT(!tree->ptr_arr, TREE_REINIT);
-
-    if(add_chunk_(tree))
-        return TREE_BAD_ALLOC;
-
-    tree->ptr_arr[0][0] = {root_data, nullptr, nullptr};
-    tree->size = 1;
-    tree->root = &tree->ptr_arr[0][0];
-
-    return TREE_NOERR;
-}
-
 tree_err tree_dstr(Tree* tree)
 {
     ASSERT(tree, TREE_NULLPTR);
@@ -84,7 +69,6 @@ tree_err tree_dstr(Tree* tree)
 tree_err tree_add(Tree* tree, Node** base_ptr, Lexem data)
 {
     ASSERT(tree && base_ptr, TREE_NULLPTR);
-    ASSERT(tree->ptr_arr, TREE_NOTINIT);
 
     if(tree->cap == tree->size)
         if(add_chunk_(tree))
