@@ -27,10 +27,10 @@ digraph G{
     graph [dpi = 100];
     bgcolor = "#2F353B";
     ranksep = 0.5;
-    nodesep = 0.5;
+    nodesep = 0.75;
     edge[minlen = 3, arrowsize = 2, penwidth = 1.5, color = green];
-    node[shape = rectangle, style = "filled, rounded", fillcolor = "#C5D0E6", fontsize = 30,
-         color = "#C5D0E6", penwidth = 3];
+    node[shape = rectangle, style = "filled", fillcolor = "#C5D0E6", fontsize = 30,
+         color = "#C5D0E6", penwidth = 5];
 )";
 
 static const char GRAPHVIZ_OUTRO[] = "}\n";
@@ -43,11 +43,29 @@ static char* graphviz_png_()
     return filename;
 }
 
-static void tree_print_node_(Node* node, size_t depth)
+static void tree_print_node_(Node* node, size_t)
 {
     FILE* stream = TEMP_GRAPH_STREAM;
 
-    PRINT("node%p[label = \"%s\"]", node, demangle(&node->lex));
+    PRINT("node%p[label = \"%s\nP:%p\nL:%p\", ", node, demangle(&node->lex), node, node->lex.location.head);
+
+    switch(node->lex.type)
+    {
+        case LEXT_OP:
+            PRINT("shape = diamond, color = red]");
+            break;
+        case LEXT_FUNC:
+            PRINT("shape = polygon, sides = 6, color = orange]");
+            break;
+        case LEXT_VAR:
+            PRINT("shape = box, color = blue]");
+            break;
+        case LEXT_IMMCONST:
+            PRINT("shape = oval, color = yellow]");
+            break;
+        default : case LEXT_NOTYPE : case LEXT_PAREN :
+            assert(0);
+    }
 
     if(node->left  != nullptr)
         PRINT("node%p -> node%p [color = green];\n", node, node->left);
@@ -153,7 +171,7 @@ void tree_dump(Tree* tree, const char msg[], tree_err errcode)
 
     PRINT("size: %lld\n" "capacity: %lld\n", tree->size, tree->cap);
 
-    if(!tree->ptr_arr)
+    if(!tree->root)
     {
         PRINT("<span class = \"error\"> %s </span>\n", DATA_IS_NULL_MSG);
         PRINT("<span class = \"title\">\n----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n</span>");

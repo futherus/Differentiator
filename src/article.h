@@ -3,8 +3,18 @@
 
 #include "tree/Tree.h"
 
-void tree_tex_init();
+enum article_enum
+{
+    ARTICLE_BEFORE_DRVTV  = 0,
+    ARTICLE_BEFORE_CUTTER = 1,
+    ARTICLE_RESULT        = 2,
+    ARTICLE_RANDOM        = 666,
+};
 
-void tree_tex_dump(Tree* tree);
+void article_init();
+
+void article_note(article_enum num);
+
+void article_expression(Tree* tree);
 
 #endif // ARTICLE_H

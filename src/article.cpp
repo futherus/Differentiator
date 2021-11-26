@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <time.h>
 
 #ifndef __USE_MINGW_ANSI_STDIO
 #define __USE_MINGW_ANSI_STDIO 1
@@ -16,22 +17,81 @@ static const char TREE_TEXFILE[]  = "tree_tex.pdf";
 
 static FILE* TEX_STREAM = nullptr;
 
+
+static const char NOTE_BEFORE_DRVTV[]  = "Возьмем для примера несложную производную";
+static const char NOTE_BEFORE_CUTTER[] = "Проведя несколько элементарных выкладок над данным выражением";
+static const char NOTE_RESULT[]        = "получаем довольно очевидный результат";
+
+static const char* NOTE_ARR[]  = {
+    "Из школьного курса алгебры известно",
+    "Из очевидной симметрии",
+    "Как известно",
+    "Произвольная ... такая, что...",
+    "Для нахождения ... дважды применим теорему 3.5",
+    "Из геометрических соображений",
+    "Просто скатав из Корявова",
+    "Из этого следует",
+    "Легко понять",
+    "Легко видеть",
+    "Не теряя общности можем сказать, что",
+    "Как легко убедиться",
+    "В самом деле",
+    "Действительно",
+    "Аналогичное рассуждение показывает, что",
+    "С другой стороны",
+    "Отметим одно очевидное умозаключение, которое часто будет встречаться в дальнейшем",
+    "Дальнейшие выкладки оставляем читателю в качестве упражнения",
+    };
+
 static char TEX_TEMP_FILE[] = "tree_dump/tex_temp.tex";
 
 static const char TEX_INTRO[] = 
 R"(
-\documentclass[11pt]{article}
+\documentclass[12pt]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
 \usepackage{geometry} 
 \geometry{a4paper} 
 \usepackage{graphicx}
 
-\title{Brief Article}
-\author{The Author}
-
 \begin{document}
 
-\maketitle
+\begin{titlepage}
+   \begin{center}
+        \sffamily
+        \itshape
+        \Huge
+        А. Л. Симанкович
+        \vspace*{1cm}
+        
+        \textbf{ОСНОВЫ МАТЕМАТИЧЕСКОГО  КАТАРСИСА}
+       
+        \vspace{0.5cm}
+        
+        \textbf{1}
+            
+        \vspace{1.5cm}
+        \large
+        Издание девятое, \\
+        стереотипное
+
+        \vfill
+        \normalfont
+        \normalsize
+        \begin{minipage}{10cm}
+        \begin{center}
+        Допущено министерством образования Республики Беларусь в качестве учебника для студентов лучшего высшего учебного заведения, невысыпающихся по направлениям подготовки и специальностям в области сверхЪестественных наук и математики, техники и технологий, образования и педагогики  
+        \end{center}
+        \end{minipage}
+        
+        \vspace{2cm}
+        \includegraphics[scale = 0.08]{logo.jpg}
+        \vspace{0.5cm}
+        
+        2021
+   \end{center}
+\end{titlepage}
+
 )";
 
 static const char TEX_OUTRO[] = 
@@ -59,14 +119,34 @@ static int get_priority_(Node* check)
     return 0;
 }
 
-static void tree_tex_node_(Node* node, Node* parent)
+static void tex_node_(Node* node, Node* parent)
 {
+    assert(node);
+    
     FILE* stream = TEX_STREAM;
+
+    bool is_parentheses = false;
+    bool is_derivative  = false;
+
+    if(get_priority_(node) <= get_priority_(parent))
+        is_parentheses = true;
+    else
+        is_parentheses = false;
+
+    if(parent)
+        if(node->lex.location.head != parent->lex.location.head)
+        {
+            is_derivative  = true;
+            is_parentheses = false;
+        }
+
+    if(is_derivative)
+        PRINT("(");
 
     switch(node->lex.type)
     {
         case LEXT_OP:
-            if(get_priority_(node) <= get_priority_(parent))
+            if(is_parentheses)
                 PRINT("(");
 
             switch(node->lex.value.code)
@@ -78,7 +158,7 @@ static void tree_tex_node_(Node* node, Node* parent)
                 { /*fallthrough*/ }
             }
             
-            tree_tex_node_(node->left, node);
+            tex_node_(node->left, node);
 
             switch(node->lex.value.code)
             {
@@ -96,7 +176,7 @@ static void tree_tex_node_(Node* node, Node* parent)
                     break;
             }
 
-            tree_tex_node_(node->right, node);
+            tex_node_(node->right, node);
 
             switch(node->lex.value.code)
             {
@@ -107,33 +187,65 @@ static void tree_tex_node_(Node* node, Node* parent)
                 { /*fallthrough*/ }
             }
 
-            if(get_priority_(node) <= get_priority_(parent))
+            if(is_parentheses)
                 PRINT(")");
 
             break;
         case LEXT_FUNC:
             PRINT("%s(", demangle(&node->lex));
 
-            tree_tex_node_(node->left, node);
+            tex_node_(node->left, node);
             
             PRINT(")");
             break;
         default:
             PRINT("%s", demangle(&node->lex));
     }
+
+    if(is_derivative)
+        PRINT(")'");
 }
 
-void tree_tex_dump(Tree* tree)
+void article_note(article_enum num)
 {
+    FILE* stream = TEX_STREAM;
+    if(!stream)
+        return;
+    
+    switch(num)
+    {
+        case ARTICLE_BEFORE_DRVTV:
+            PRINT("%s\n", NOTE_BEFORE_DRVTV);
+            return;
+        case ARTICLE_BEFORE_CUTTER:
+            PRINT("%s\n", NOTE_BEFORE_CUTTER);
+            return;
+        case ARTICLE_RESULT:
+            PRINT("%s\n", NOTE_RESULT);
+            return;
+        case ARTICLE_RANDOM:
+            num = (article_enum) (rand() % (sizeof(NOTE_ARR) / sizeof(char*)));
+            PRINT("%s\n", NOTE_ARR[num]);
+            return;
+        default:
+            assert(0);
+    }
+}
+
+void article_expression(Tree* tree)
+{
+    assert(tree);
+    assert(tree->root);
+
     FILE* stream = TEX_STREAM;
     if(stream == nullptr)
         return;
 
-    PRINT("$$");
+    PRINT("\\begin{eqnarray}\n");
 
-    tree_tex_node_(tree->root, nullptr);
+    tex_node_(tree->root, nullptr);
 
-    PRINT("$$");
+    PRINT("\\end{eqnarray}\n");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,7 +263,7 @@ static void close_texfile_()
     system(sys_cmd);
 }
 
-void tree_tex_init()
+void article_init()
 {
     if(TREE_TEXFILE[0] != 0)
     {
@@ -161,7 +273,8 @@ void tree_tex_init()
         {
             atexit(&close_texfile_);
             fprintf(TEX_STREAM, "%s", TEX_INTRO);
-            
+            srand((unsigned int) time(nullptr));
+
             return;
         }
 

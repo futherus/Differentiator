@@ -39,22 +39,30 @@ int main()
     fread(buffer, sizeof(char), file_size, instream);
     ASSERT_RET$(!ferror(instream), DIFFTOR_READ_FAIL);
     
-    Tree tree = {};
     tree_dump_init(dumpsystem_get_stream(log));
-    tree_tex_init();
+    article_init();
 
-    parse(&tree, buffer);
-    tree_tex_dump(&tree);
+    Tree tree = {};
     Tree derived_tree = {};
 
+    parse(&tree, buffer);
+    tree_dump(&derived_tree, "ORIGINAL_TREE");
+
+    article_note(ARTICLE_BEFORE_DRVTV);
+    article_expression(&tree);
     derivate(&derived_tree, &tree);
+    tree_dump(&derived_tree, "DERIVED_TREE");
 
-    tree_dump(&derived_tree, "dump");
-    
+    article_note(ARTICLE_BEFORE_CUTTER);
+    article_expression(&derived_tree);
     cutter(&derived_tree);
+    tree_dump(&derived_tree, "CUTTED_TREE");
 
-    tree_dump(&derived_tree, "dump");
-    tree_tex_dump(&derived_tree);
+    article_note(ARTICLE_RESULT);
+    article_expression(&derived_tree);
+
+    tree_dstr(&tree);
+    tree_dstr(&derived_tree);
 
     return 0;
 }

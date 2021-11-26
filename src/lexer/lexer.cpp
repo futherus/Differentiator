@@ -91,7 +91,7 @@ static lexer_err lexer_(char* data)
 
     clean_whitespaces_(txt, &pos);
 
-    TMP_LEX_.pos = pos;
+    TMP_LEX_.location.pos = pos;
     
     int n_read = 0;
 
@@ -188,7 +188,7 @@ char* demangle(const Lexem* lex)
             sprintf(buffer, "%lg", lex->value.num);
             break;
         }
-        case LEXT_OP : case LEXT_PAREN : case LEXT_DELIM :
+        case LEXT_OP : case LEXT_PAREN :
         {
             sprintf(buffer, "%c", lex->value.code);
             break;

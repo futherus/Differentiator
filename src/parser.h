@@ -12,6 +12,7 @@ enum parser_err
     PARSER_LEXER_FAIL = 3,
     PARSER_FLTHRGH = 4,
     PARSER_MISS_PAREN = 5,
+    PARSER_UNEXPCTD_OP = 6,
 };
 
 parser_err parse(Tree* tree, char* data);

@@ -20,9 +20,8 @@ enum Lexem_type
     LEXT_IMMCONST = 1,
     LEXT_OP       = 2,
     LEXT_PAREN    = 3,
-    LEXT_DELIM    = 4,
-    LEXT_VAR      = 5,
-    LEXT_FUNC     = 6,
+    LEXT_VAR      = 4,
+    LEXT_FUNC     = 5,
 };
 
 #define DEF_SYMB(TYPE, SYMB, CODE) LEX_##CODE = SYMB,
@@ -42,7 +41,12 @@ enum Lexem_code
 struct Lexem 
 {
     Lexem_type type = LEXT_NOTYPE;
-    size_t pos = 0;
+    
+    union Location
+    {
+        size_t pos;
+        void*  head;
+    } location;
 
     union Value
     {

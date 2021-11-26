@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "derivative.h"
+#include "article.h"
 #include "dumpsystem/dumpsystem.h"
 
 #define NUM(BASE_NODE, VAL) PASS$(!tree_add_num(tree, (BASE_NODE), (VAL)), return DRVTV_TREE_FAIL; )
@@ -26,12 +27,21 @@ inline tree_err tree_add_code(Tree* tree, Node** base_node, Lexem_type type, Lex
     return tree_add(tree, base_node, &tmp);
 }
 
-#define MKNODE(BASE_NODE, LEX) PASS$(!tree_add(tree, (BASE_NODE), (LEX)),   return DRVTV_TREE_FAIL; )
-#define DERIV(BASE_NODE, NODE) PASS$(!derivate_(tree, (BASE_NODE), (NODE)), return DRVTV_PASS_ERR;  )
+#define MKNODE(BASE_NODE, LEX)  PASS$(!tree_add(tree,  (BASE_NODE), (LEX)),    return DRVTV_TREE_FAIL; )
+#define COPY(BASE_NODE, ORIGIN) PASS$(!tree_copy(tree, (BASE_NODE), (ORIGIN)), return DRVTV_TREE_FAIL; )
+#define DERIV(BASE_NODE, NODE)  PASS$(!derivate_(tree, (BASE_NODE), (NODE)),   return DRVTV_PASS_ERR;  )
 
 static derivative_err derivate_(Tree* tree, Node** base, Node* in)
 {
     assert(tree && base && in);
+
+    //tree_dump(tree, "dump");
+    //LOG$("LEX: %s", demangle(&in->lex));
+    if(tree->size)
+    {
+        article_note(ARTICLE_RANDOM);
+        article_expression(tree);
+    }
 
     switch(in->lex.type)
     {
@@ -49,9 +59,11 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
                 case LEX_ADD : case LEX_SUB :
                     MKNODE(base, &in->lex);
 
+                    (*base)->left  = in->left;
+                    (*base)->right = in->right;
+
                     DERIV(&(*base)->left, in->left);
                     DERIV(&(*base)->right, in->right);
-
                     break;
                 case LEX_MUL:
                     OP(base, ADD);
@@ -59,11 +71,13 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
                     OP(&(*base)->left,  MUL);
                     OP(&(*base)->right, MUL);
                     
-                    DERIV(&(*base)->left->left, in->left);
-                    (*base)->left->right = in->right;
-                    (*base)->right->left = in->left;
-                    DERIV(&(*base)->right->right, in->right);
+                    (*base)->left->left = in->left;
+                    COPY(&(*base)->left->right, in->right);
+                    COPY(&(*base)->right->left, in->left);
+                    (*base)->right->right = in->right;
 
+                    DERIV(&(*base)->left->left, in->left);
+                    DERIV(&(*base)->right->right, in->right);
                     break;
                 case LEX_DIV:
                     OP(base, DIV);
@@ -73,34 +87,42 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
 
                     OP(&(*base)->left->left,  MUL);
                     OP(&(*base)->left->right, MUL);
-                    (*base)->right->left  = in->right;
-                    (*base)->right->right = in->right;
+                    COPY(&(*base)->right->left, in->right);
+                    COPY(&(*base)->right->right, in->right);
+
+                    (*base)->left->left->left = in->left;
+                    COPY(&(*base)->left->left->right, in->right);
+                    COPY(&(*base)->left->right->left, in->left);
+                    (*base)->left->right->right = in->right;
 
                     DERIV(&(*base)->left->left->left, in->left);
-                    (*base)->left->left->right = in->right;
-                    (*base)->left->right->left = in->left;
                     DERIV(&(*base)->left->right->right, in->right);
-
                     break;
                 case LEX_POW:
                 {
-                    Node* tmp_root = nullptr;
-
                     OP(base, MUL);
 
-                    (*base)->left = in;
-                    OP(&tmp_root, MUL);
+                    COPY(&(*base)->left, in);
+                    OP(&(*base)->right, ADD);
 
-                    FUNC(&tmp_root->left, ln);
-                    tmp_root->right = in->right;
+                    OP(&(*base)->right->left,  MUL);
+                    OP(&(*base)->right->right, MUL);
 
-                    tmp_root->left->left = in->left;
+                    OP(&(*base)->right->left->left, DIV);
+                    (*base)->right->left->right = in->left;
+                    FUNC(&(*base)->right->right->left, ln);
+                    (*base)->right->right->right = in->right;
+                    
+                    COPY(&(*base)->right->left->left->left,  in->right);
+                    COPY(&(*base)->right->left->left->right, in->left);
+                    COPY(&(*base)->right->right->left->left, in->left);
 
-                    DERIV(&(*base)->right, tmp_root);
+                    DERIV(&(*base)->right->left->right,  in->left);
+                    DERIV(&(*base)->right->right->right, in->right);
 
                     break;
                 }
-                default:
+                default : case LEX_NOCODE :
                     ASSERT$(0, DRVTV_NOTFOUND, assert(0); );
             }
             
@@ -112,37 +134,44 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
                     OP(base, MUL);
 
                     FUNC(&(*base)->left, cos);
+                    (*base)->right = in->left;
+
+                    COPY(&(*base)->left->left, in->left);
+
                     DERIV(&(*base)->right, in->left);
-
-                    (*base)->left->left = in->left;
-
                     break;
                 case LEX_cos:
                     OP(base, MUL);
 
                     OP(&(*base)->left, SUB);
-                    DERIV(&(*base)->right, in->left);
+                    (*base)->right = in->left;
 
                     NUM(&(*base)->left->left, 0);
 
                     FUNC(&(*base)->left->right, sin);
                     
-                    (*base)->left->right->left = in->left;
+                    COPY(&(*base)->left->right->left, in->left);
 
+                    DERIV(&(*base)->right, in->left);
                     break;
                 case LEX_ln:
-                    OP(base, POW);
+                    OP(base, MUL);
 
-                    (*base)->left = in->left;
-                    NUM(&(*base)->right, -1);
+                    OP(&(*base)->left, POW);
+                    (*base)->right = in->left;
 
+                    COPY(&(*base)->left->left, in->left);
+
+                    NUM(&(*base)->left->right, -1);
+
+                    DERIV(&(*base)->right, in->left);
                     break;
                 default:
                     ASSERT$(0, DRVTV_NOTFOUND, assert(0); );
             }
 
             break;
-        default:
+        default: case LEXT_NOTYPE : case LEXT_PAREN :
             ASSERT$(0, DRVTV_NOTFOUND, assert(0); );
     }
 
@@ -152,6 +181,7 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
 derivative_err derivate(Tree* tree_out, Tree* tree_in)
 {
     ASSERT_RET$(tree_out && tree_in, DRVTV_NULLPTR);
+    tree_out->root = tree_in->root;
 
     PASS$(!derivate_(tree_out, &(tree_out->root), tree_in->root), return DRVTV_PASS_ERR; );
 

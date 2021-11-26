@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "Tree.h"
-#include "../dumpsystem/dumpsystem.h"
 
 #define ASSERT(CONDITION, ERROR)                \
     do                                          \
@@ -77,10 +76,35 @@ tree_err tree_add(Tree* tree, Node** base_ptr, const Lexem* data)
 
     Node* new_node = &tree->ptr_arr[tree->size / TREE_CHUNK_SIZE][tree->size % TREE_CHUNK_SIZE];
     *new_node  = {*data, nullptr, nullptr};
+    new_node->lex.location.head = tree;
     *base_ptr  = new_node;
 
     tree->size++;
 
+    return TREE_NOERR;
+}
+
+static tree_err tree_copy_(Tree* tree, Node** ptr, Node* orig)
+{
+    assert(tree && ptr && orig);
+
+    PASS(!tree_add(tree, ptr, &orig->lex), TREE_BAD_ALLOC);
+
+    if(orig->left)
+        PASS(!tree_copy_(tree, &(*ptr)->left, orig->left), TREE_BAD_ALLOC);
+
+    if(orig->right)
+        PASS(!tree_copy_(tree, &(*ptr)->right, orig->right), TREE_BAD_ALLOC);
+    
+    return TREE_NOERR;
+}
+
+tree_err tree_copy(Tree* tree, Node** base_ptr, Node* origin)
+{
+    ASSERT(tree && base_ptr && origin, TREE_NULLPTR);
+
+    PASS(!tree_copy_(tree, base_ptr, origin), TREE_BAD_ALLOC);
+    
     return TREE_NOERR;
 }
 
@@ -107,7 +131,7 @@ static void tree_visitor_(Node* node)
 tree_err tree_visitor(Tree* tree, void (*function)(Node* node, size_t depth))
 {
     ASSERT(tree && function, TREE_NULLPTR);
-    ASSERT(tree->ptr_arr, TREE_NOTINIT);
+    ASSERT(tree->root, TREE_NOTINIT);
 
     VISITOR_FUNCTION_ = function;
     VISITOR_DEPTH_    = -1;

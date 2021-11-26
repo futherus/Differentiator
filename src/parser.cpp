@@ -13,8 +13,8 @@ static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
 
     ASSERT_RET$(!tree_add(tree, node_ptr, &lex), PARSER_TREE_FAIL);
 
-    PASS$(!consume(&lex),        return PARSER_LEXER_FAIL; );
-    ASSERT_RET$(lex.type == LEXT_PAREN, PARSER_MISS_PAREN; );
+    PASS$(!consume(&lex), return PARSER_LEXER_FAIL; );
+    ASSERT_RET$(lex.type == LEXT_PAREN, PARSER_MISS_PAREN);
 
     switch(lex.value.code)
     {
@@ -36,26 +36,33 @@ static parser_err parse_lexem_(Tree* tree, Node** node_ptr)
             PASS$(!parse_lexem_(tree, &(*node_ptr)->left),   return PARSER_PASS_ERR;   );
 
             PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
+            (*node_ptr)->lex.location.head = tree;
 
             PASS$(!parse_lexem_(tree, &(*node_ptr)->right),  return PARSER_PASS_ERR;   );
             
             break;
         case LEXT_IMMCONST : case LEXT_VAR :
             PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
+            (*node_ptr)->lex.location.head = tree;
             
             break;
         case LEXT_FUNC:
             PASS$(!consume(&(*node_ptr)->lex),               return PARSER_LEXER_FAIL; );
+            (*node_ptr)->lex.location.head = tree;
 
             PASS$(!parse_lexem_(tree, &(*node_ptr)->left),   return PARSER_PASS_ERR;   );
 
+            break;
+        case LEXT_OP:
+            ASSERT_RET$(0, PARSER_UNEXPCTD_OP);
+            
             break;
         default: case LEXT_NOTYPE :
             ASSERT$(0, PARSER_FLTHRGH, assert(0); );
     }
 
-    PASS$(!consume(&lex),                                    return PARSER_LEXER_FAIL; );
-    ASSERT_RET$(lex.type == LEXT_PAREN && lex.value.code == expctd, PARSER_MISS_PAREN; );
+    PASS$(!consume(&lex), return PARSER_LEXER_FAIL; );
+    ASSERT_RET$(lex.type == LEXT_PAREN && lex.value.code == expctd, PARSER_MISS_PAREN);
 
     return PARSER_NOERR;
 }

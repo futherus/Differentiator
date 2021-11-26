@@ -42,6 +42,7 @@ enum tree_err
 tree_err tree_dstr(Tree* tree);
 
 tree_err tree_add(Tree* tree, Node** base_ptr, const Lexem* data);
+tree_err tree_copy(Tree* tree, Node** base_ptr, Node* origin);
 
 tree_err tree_visitor(Tree* tree, void (*function)(Node* node, size_t depth));
 

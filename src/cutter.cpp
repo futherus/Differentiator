@@ -132,6 +132,8 @@ static void cut_zero_one_(Node** node)
             case LEX_DIV:
                 cut_div_(node);
                 break;
+            default:
+                ASSERT$(0, UNKNOWN_OPERATOR, assert(0); );
         }
     }
 }
@@ -165,7 +167,7 @@ static void evaluate_operator_(Node* node)
             result = pow(left, right);
             break;
         default:
-            assert(0);
+            ASSERT$(0, UNKNOWN_OPERATOR, assert(0); );
     }
 
     node->left  = nullptr;
@@ -192,8 +194,11 @@ static void evaluate_function_(Node* node)
         case LEX_cos:
             result = cos(left);
             break;
+        case LEX_ln:
+            result = log(left);
+            break;
         default:
-            assert(0);
+            ASSERT$(0, UNKNOWN_FUNCTION, assert(0); );
     }
 
     node->left  = nullptr;

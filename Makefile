@@ -13,7 +13,7 @@ LIB := iconv
 TARGET := $(BINFLDR)/Differentiator.exe
 
 all: build
-	.\$(TARGET)''
+	.\$(TARGET)
 
 build: $(OBJ)
 	$(CXX) $(addprefix $(OBJFLDR), $(OBJ)) $(addprefix -l, $(LIB)) -o $(TARGET)
