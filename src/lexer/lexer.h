@@ -14,44 +14,39 @@ enum lexer_err
     LEXER_NOTFOUND = 6,
 };
 
-enum Lexem_type
-{
-    LEXT_NOTYPE   = 0,
-    LEXT_IMMCONST = 1,
-    LEXT_OP       = 2,
-    LEXT_PAREN    = 3,
-    LEXT_VAR      = 4,
-    LEXT_FUNC     = 5,
-};
-
-#define DEF_SYMB(TYPE, SYMB, CODE) LEX_##CODE = SYMB,
-#define DEF_NAME(TYPE, HASH, NAME) LEX_##NAME,
+#define DEF_OP(SYMB, CODE) LEX_##CODE = SYMB,
+#define DEF_PAREN(SYMB, CODE) LEX_##CODE = SYMB,
+#define DEF_FUNC(HASH, NAME) LEX_##NAME,
 enum Lexem_code
 {
-    LEX_NOCODE = 0,
+    LEX_NOCODE   = 0,
+    LEX_IMMCONST = 1,
+    LEX_VAR      = 2,
 
-    #include "reserved_names.inc"
+    #include "../reserved_functions.inc"
 
-    #include "reserved_symbols.inc"
+    #include "../reserved_operators.inc"
+
+    #include "../reserved_parentheses.inc"
 
 };
-#undef DEF_SYMB
-#undef DEF_NAME
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC
 
 struct Lexem 
 {
-    Lexem_type type = LEXT_NOTYPE;
+    Lexem_code code = LEX_NOCODE;
     
     union Location
     {
-        size_t pos;
-        void*  head;
+        size_t pos;      //< for position in string
+        void*  head;     //< for pointer to head structure, e.g. Tree for Lexem used in Node
     } location;
 
     union Value
     {
         double      num; //< for immensive constants
-        Lexem_code code; //< for reserved names
         uint64_t   hash; //< for string   names
     } value;
 };

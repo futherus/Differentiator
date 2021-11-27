@@ -1,0 +1,5 @@
+DEF_OP('+', ADD)
+DEF_OP('-', SUB)
+DEF_OP('*', MUL)
+DEF_OP('/', DIV)
+DEF_OP('^', POW)

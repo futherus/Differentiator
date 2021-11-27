@@ -43,28 +43,52 @@ static char* graphviz_png_()
     return filename;
 }
 
+#define DEF_OP(SYMB, CODE)            \
+    case (LEX_##CODE):                \
+
+#define DEF_PAREN(SYMB, CODE)         \
+    case (LEX_##CODE):                \
+
+#define DEF_FUNC(HASH, NAME)          \
+    case(LEX_##NAME):                 \
+
 static void tree_print_node_(Node* node, size_t)
 {
     FILE* stream = TEMP_GRAPH_STREAM;
 
     PRINT("node%p[label = \"%s\nP:%p\nL:%p\", ", node, demangle(&node->lex), node, node->lex.location.head);
 
-    switch(node->lex.type)
+    switch(node->lex.code)
     {
-        case LEXT_OP:
-            PRINT("shape = diamond, color = red]");
-            break;
-        case LEXT_FUNC:
-            PRINT("shape = polygon, sides = 6, color = orange]");
-            break;
-        case LEXT_VAR:
+        case LEX_VAR:
+        {
             PRINT("shape = box, color = blue]");
+
             break;
-        case LEXT_IMMCONST:
+        }
+        case LEX_IMMCONST:
+        {
             PRINT("shape = oval, color = yellow]");
+
             break;
-        default : case LEXT_NOTYPE : case LEXT_PAREN :
+        }
+        #include "../reserved_operators.inc"
+        {
+            PRINT("shape = diamond, color = red]");
+
+            break;
+        }
+        #include "../reserved_functions.inc"
+        {
+            PRINT("shape = polygon, sides = 6, color = orange]");
+
+            break;
+        }
+        default : case LEX_NOCODE : 
+                                    #include "../reserved_parentheses.inc"
+        {
             assert(0);
+        }
     }
 
     if(node->left  != nullptr)
@@ -72,6 +96,10 @@ static void tree_print_node_(Node* node, size_t)
     if(node->right != nullptr)
         PRINT("node%p -> node%p [color = orange];\n", node, node->right);
 }
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC
+
 
 static void tree_graph_dump_(Tree* tree)
 {

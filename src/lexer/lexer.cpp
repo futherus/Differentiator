@@ -57,18 +57,23 @@ static void wordlen_(char* ptr, int* n_read)
         (*n_read)++;
 }
 
-#define DEF_SYMB(TYPE, SYMB, CODE)            \
+#define DEF_OP(SYMB, CODE)                    \
     case (SYMB):                              \
-        TMP_LEX_.type = LEXT_##TYPE;          \
-        TMP_LEX_.value.code = LEX_##CODE;     \
+        TMP_LEX_.code = LEX_##CODE;           \
         IS_TMP_LEX_ = true;                   \
         pos += 1;                             \
         return LEXER_NOERR;                   \
 
-#define DEF_NAME(TYPE, HASH, NAME)            \
+#define DEF_PAREN(SYMB, CODE)                 \
+    case (SYMB):                              \
+        TMP_LEX_.code = LEX_##CODE;           \
+        IS_TMP_LEX_ = true;                   \
+        pos += 1;                             \
+        return LEXER_NOERR;                   \
+
+#define DEF_FUNC(HASH, NAME)                  \
     case (HASH):                              \
-        TMP_LEX_.type = LEXT_##TYPE;          \
-        TMP_LEX_.value.code = LEX_##NAME;     \
+        TMP_LEX_.code = LEX_##NAME;           \
         IS_TMP_LEX_ = true;                   \
         pos += n_read;                        \
         return LEXER_NOERR;                   \
@@ -97,7 +102,7 @@ static lexer_err lexer_(char* data)
 
     if(sscanf(txt + pos, "%lg%n", &TMP_LEX_.value.num, &n_read) > 0)
     {
-        TMP_LEX_.type = LEXT_IMMCONST;
+        TMP_LEX_.code = LEX_IMMCONST;
         IS_TMP_LEX_   = true;
         pos += n_read;
 
@@ -106,7 +111,9 @@ static lexer_err lexer_(char* data)
 
     switch(txt[pos])
     {
-        #include "reserved_symbols.inc"
+        #include "../reserved_operators.inc"
+        
+        #include "../reserved_parentheses.inc"
 
         default:
         { /* fallthrough */ }
@@ -119,13 +126,13 @@ static lexer_err lexer_(char* data)
     uint64_t hash = fnv1_64(txt + pos, n_read);
     switch(hash)
     {
-        #include "reserved_names.inc"
+        #include "../reserved_functions.inc"
         
         default:
         { /*fallthrough*/ }
     }
 
-    TMP_LEX_.type       = LEXT_VAR;
+    TMP_LEX_.code       = LEX_VAR;
     IS_TMP_LEX_         = true;
     TMP_LEX_.value.hash = hash;
 
@@ -136,8 +143,9 @@ static lexer_err lexer_(char* data)
     return LEXER_NOERR;
 }
 
-#undef DEF_NAME
-#undef DEF_SYMB
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC
 
 lexer_err lexer(char* data)
 {
@@ -172,40 +180,29 @@ lexer_err peek(Lexem* lex)
     return LEXER_NOERR;
 }
 
-#define DEF_NAME(TYPE, HASH, NAME)      \
-    case(LEX_##NAME):                   \
-        sprintf(buffer, "%s", #NAME);   \
-        break;                          \
+#define DEF_OP(SYMB, CODE)            \
+    case (LEX_##CODE):                \
+
+#define DEF_PAREN(SYMB, CODE)         \
+    case (LEX_##CODE):                \
+
+#define DEF_FUNC(HASH, NAME)          \
+    case(LEX_##NAME):                 \
+        sprintf(buffer, "%s", #NAME); \
+        break;                        \
 
 char* demangle(const Lexem* lex)
 {
     static char buffer[1000] = "";
 
-    switch(lex->type)
+    switch(lex->code)
     {
-        case LEXT_IMMCONST:
+        case LEX_IMMCONST:
         {
             sprintf(buffer, "%lg", lex->value.num);
             break;
         }
-        case LEXT_OP : case LEXT_PAREN :
-        {
-            sprintf(buffer, "%c", lex->value.code);
-            break;
-        }
-        case LEXT_FUNC:
-        {
-            switch(lex->value.code)
-            {
-                #include "reserved_names.inc"
-
-                default:
-                    ASSERT$(0, LEXER_NOTFOUND, assert(0); );
-            }
-            
-            break;
-        }
-        case LEXT_VAR:
+        case LEX_VAR:
         {
             const char* ptr = find_name_(lex->value.hash);
             ASSERT$(ptr, LEXER_NOTFOUND, assert(0); );
@@ -214,10 +211,25 @@ char* demangle(const Lexem* lex)
 
             break;
         }
-        default: case LEXT_NOTYPE :
+        
+        // case LEX_ADD : case LEX_SUB : case LEX_LQPAR : ...
+        #include "../reserved_parentheses.inc"
+        #include "../reserved_operators.inc"
+        {
+            sprintf(buffer, "%c", lex->code);
+            break;
+        }
+
+        #include "../reserved_functions.inc"
+
+        default : case LEX_NOCODE :
             ASSERT$(0, LEXER_NOTFOUND, assert(0); );
+            break;
     }
 
     return buffer;
 }
-#undef DEF_NAME
+
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC

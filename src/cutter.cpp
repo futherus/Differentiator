@@ -7,7 +7,7 @@
 
 static int OPT_STATE = 0;
 
-#define IF_NUM(NUM, LEX) if((LEX).type == LEXT_IMMCONST && (LEX).value.num == (NUM))
+#define IF_NUM(NUM, LEX) if((LEX).code == LEX_IMMCONST && (LEX).value.num == (NUM))
 
 static void cut_add_(Node** node)
 {
@@ -103,7 +103,16 @@ static void cut_pow_(Node** node)
     }
 }
 
-static void cut_zero_one_(Node** node)
+#define DEF_OP(SYMB, CODE)            \
+    case (LEX_##CODE):                \
+
+#define DEF_PAREN(SYMB, CODE)         \
+    case (LEX_##CODE):                \
+
+#define DEF_FUNC(HASH, NAME)          \
+    case(LEX_##NAME):                 \
+
+static int cut_zero_one_(Node** node)
 {
     assert(node);
 
@@ -113,104 +122,143 @@ static void cut_zero_one_(Node** node)
     if((*node)->right)
         cut_zero_one_(&(*node)->right);
 
-    if((*node)->lex.type == LEXT_OP)
+    switch((*node)->lex.code)
     {
-        switch((*node)->lex.value.code)
+        case LEX_ADD:
+            cut_add_(node);
+            break;
+
+        case LEX_SUB:
+            cut_sub_(node);
+            break;
+
+        case LEX_MUL:
+            cut_mul_(node);
+            break;
+            
+        case LEX_POW:
+            cut_pow_(node);
+            break;
+
+        case LEX_DIV:
+            cut_div_(node);
+            break;
+
+        case LEX_IMMCONST : case LEX_VAR :
+                #include "reserved_functions.inc"
         {
-            case LEX_ADD:
-                cut_add_(node);
-                break;
-            case LEX_SUB:
-                cut_sub_(node);
-                break;
-            case LEX_MUL:
-                cut_mul_(node);
-                break;
-            case LEX_POW:
-                cut_pow_(node);
-                break;
-            case LEX_DIV:
-                cut_div_(node);
-                break;
-            default:
-                ASSERT$(0, UNKNOWN_OPERATOR, assert(0); );
+            break;
+        }
+
+        default : case LEX_NOCODE :
+                #include "reserved_parentheses.inc"
+        {
+            return 1;
         }
     }
+
+    return 0;
 }
 
-static void evaluate_operator_(Node* node)
+static int evaluate_operator_(Node* node)
 {
     assert(node);
 
-    if(node->left->lex.type != LEXT_IMMCONST || node->right->lex.type != LEXT_IMMCONST)
-        return;
+    if(node->left->lex.code != LEX_IMMCONST || node->right->lex.code != LEX_IMMCONST)
+        return 0;
 
     double left   = node->left->lex.value.num;
     double right  = node->right->lex.value.num;
     double result = 0;
 
-    switch(node->lex.value.code)
+    switch(node->lex.code)
     {
         case LEX_ADD:
             result = left + right;
             break;
+
         case LEX_SUB:
             result = left - right;
             break;
+
         case LEX_MUL:
             result = left * right;
             break;
+            
         case LEX_DIV:
             result = left / right;
             break;
+
         case LEX_POW:
             result = pow(left, right);
             break;
-        default:
-            ASSERT$(0, UNKNOWN_OPERATOR, assert(0); );
+        
+        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE :
+                #include "reserved_parentheses.inc"
+                #include "reserved_functions.inc"
+        {
+            return 1;
+        }
     }
 
     node->left  = nullptr;
     node->right = nullptr;
-    node->lex.type      = LEXT_IMMCONST;
+    node->lex.code      = LEX_IMMCONST;
     node->lex.value.num = result;
     OPT_STATE = 1;
+
+    return 0;
 }
 
-static void evaluate_function_(Node* node)
+static int evaluate_function_(Node* node)
 {
     assert(node);
 
-    if(node->left->lex.type != LEXT_IMMCONST)
-        return;
+    if(node->left->lex.code != LEX_IMMCONST)
+        return 0;
     
     double left   = node->left->lex.value.num;
     double result = 0;
-    switch(node->lex.value.code)
+    switch(node->lex.code)
     {
         case LEX_sin:
             result = sin(left);
             break;
+            
         case LEX_cos:
             result = cos(left);
             break;
+
         case LEX_ln:
             result = log(left);
             break;
-        default:
-            ASSERT$(0, UNKNOWN_FUNCTION, assert(0); );
+
+        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE :
+                #include "reserved_parentheses.inc"
+                #include "reserved_operators.inc"
+        {
+            return 1;
+        }
     }
 
     node->left  = nullptr;
     node->right = nullptr;
-    node->lex.type      = LEXT_IMMCONST;
+    node->lex.code      = LEX_IMMCONST;
     node->lex.value.num = result;
     OPT_STATE = 1;
+
+    return 0;
 }
 
-static void const_evaluation_(Node* node)
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC
+
+static int const_evaluation_(Node* node)
 {
     assert(node);
+
+    int ret = 0;
 
     if(node->left)
         const_evaluation_(node->left);
@@ -218,29 +266,25 @@ static void const_evaluation_(Node* node)
     if(node->right)
         const_evaluation_(node->right);
 
-    switch(node->lex.type)
-    {
-        case LEXT_FUNC:
-            evaluate_function_(node);
-            break;
-        case LEXT_OP:
-            evaluate_operator_(node);
-            break;
-        default:
-            break;
-    }
+    if(node->left)
+        ret = evaluate_function_(node);
+
+    if(node->left && node->right)
+        ret = ret && evaluate_operator_(node);
+
+    return ret;
 }
 
 void cutter(Tree* tree)
 {
+    assert(tree);
 
     OPT_STATE = 1;
 
     while(OPT_STATE)
     {
         OPT_STATE = 0;
-        const_evaluation_(tree->root);
-        cut_zero_one_(&tree->root);
+        ASSERT$(!const_evaluation_(tree->root), UNKNWN_LEXEM, assert(0); );
+        ASSERT$(!cut_zero_one_(&tree->root),    UNKNWN_LEXEM, assert(0); );
     }
-    
 }

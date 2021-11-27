@@ -17,7 +17,6 @@ static const char TREE_TEXFILE[]  = "tree_tex.pdf";
 
 static FILE* TEX_STREAM = nullptr;
 
-
 static const char NOTE_BEFORE_DRVTV[]  = "Возьмем для примера несложную производную";
 static const char NOTE_BEFORE_CUTTER[] = "Проведя несколько элементарных выкладок над данным выражением";
 static const char NOTE_RESULT[]        = "получаем довольно очевидный результат";
@@ -41,7 +40,7 @@ static const char* NOTE_ARR[]  = {
     "С другой стороны",
     "Отметим одно очевидное умозаключение, которое часто будет встречаться в дальнейшем",
     "Дальнейшие выкладки оставляем читателю в качестве упражнения",
-    };
+};
 
 static char TEX_TEMP_FILE[] = "tree_dump/tex_temp.tex";
 
@@ -99,20 +98,41 @@ R"(
 \end{document}
 )";
 
+#define DEF_PAREN(SYMB, CODE)         \
+    case (LEX_##CODE):                \
+
+#define DEF_FUNC(HASH, NAME)          \
+    case(LEX_##NAME):                 \
+
 static int get_priority_(Node* check)
 {
     if(!check)
         return 0;
 
-    switch(check->lex.value.code)
+    switch(check->lex.code)
     {
         case LEX_ADD : case LEX_SUB :
             return 1;
+            
         case LEX_MUL : case LEX_DIV :
             return 2;
+
         case LEX_POW:
             return 3;
-        default:
+
+        #include "reserved_functions.inc"
+            return 4;
+            
+        case LEX_VAR : case LEX_IMMCONST :
+            return 5;
+
+        case LEX_NOCODE: 
+                        #include "reserved_parentheses.inc"
+        {
+            assert(0);
+        }
+
+        default: 
         { /*fallthrough*/ }
     }
     
@@ -143,63 +163,56 @@ static void tex_node_(Node* node, Node* parent)
     if(is_derivative)
         PRINT("(");
 
-    switch(node->lex.type)
+    switch(node->lex.code)
     {
-        case LEXT_OP:
-            if(is_parentheses)
-                PRINT("(");
-
-            switch(node->lex.value.code)
-            {
-                case LEX_DIV:
-                    PRINT(" \\frac{");
-                    break;
-                default:
-                { /*fallthrough*/ }
-            }
-            
+        case LEX_DIV:
+            PRINT("\\frac{");
             tex_node_(node->left, node);
-
-            switch(node->lex.value.code)
-            {
-                case LEX_DIV:
-                    PRINT("}{");
-                    break;
-                case LEX_MUL:
-                    PRINT(" \\cdot ");
-                    break;
-                case LEX_POW:
-                    PRINT(" ^{");
-                    break;
-                default:
-                    PRINT(" %c ", node->lex.value.code);
-                    break;
-            }
-
+            PRINT("}{");
             tex_node_(node->right, node);
-
-            switch(node->lex.value.code)
-            {
-                case LEX_DIV : case LEX_POW :
-                    PRINT("} ");
-                    break;
-                default:
-                { /*fallthrough*/ }
-            }
-
-            if(is_parentheses)
-                PRINT(")");
-
+            PRINT("} ");
             break;
-        case LEXT_FUNC:
-            PRINT("%s(", demangle(&node->lex));
 
+        case LEX_ADD:
             tex_node_(node->left, node);
-            
+            PRINT(" + ");
+            tex_node_(node->right, node);
+            break;
+
+        case LEX_SUB:
+            tex_node_(node->left, node);
+            PRINT(" - ");
+            tex_node_(node->right, node);
+            break;
+
+        case LEX_MUL:
+            tex_node_(node->left, node);
+            PRINT(" \\cdot ");
+            tex_node_(node->right, node);
+            break;
+
+        case LEX_POW:
+            tex_node_(node->left, node);
+            PRINT("^{");
+            tex_node_(node->right, node);
+            PRINT("} ");
+            break;
+
+        #include "reserved_functions.inc"
+            PRINT("%s(", demangle(&node->lex));
+            tex_node_(node->left, node);
             PRINT(")");
             break;
-        default:
+
+        case LEX_IMMCONST : case LEX_VAR :
             PRINT("%s", demangle(&node->lex));
+            break;
+
+        default : case LEX_NOCODE :
+                #include "reserved_parentheses.inc"
+        {
+            assert(0);
+        }
     }
 
     if(is_derivative)
@@ -217,16 +230,20 @@ void article_note(article_enum num)
         case ARTICLE_BEFORE_DRVTV:
             PRINT("%s\n", NOTE_BEFORE_DRVTV);
             return;
+
         case ARTICLE_BEFORE_CUTTER:
             PRINT("%s\n", NOTE_BEFORE_CUTTER);
             return;
+
         case ARTICLE_RESULT:
             PRINT("%s\n", NOTE_RESULT);
             return;
+            
         case ARTICLE_RANDOM:
             num = (article_enum) (rand() % (sizeof(NOTE_ARR) / sizeof(char*)));
             PRINT("%s\n", NOTE_ARR[num]);
             return;
+
         default:
             assert(0);
     }
@@ -241,11 +258,18 @@ void article_expression(Tree* tree)
     if(stream == nullptr)
         return;
 
-    PRINT("\\begin{eqnarray}\n");
+    PRINT("\\begin{equation}\n");
+
+    int coin = rand() % 7;
+    if(coin == 0)
+        PRINT("\\rotatebox{180}{$\n");
 
     tex_node_(tree->root, nullptr);
 
-    PRINT("\\end{eqnarray}\n");
+    if(coin == 0)
+        PRINT("$}\n");
+
+    PRINT("\\end{equation}\n");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
