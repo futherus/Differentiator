@@ -45,10 +45,7 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
     //tree_dump(tree, "dump");
     //LOG$("LEX: %s", demangle(&in->lex));
     if(tree->size)
-    {
-        article_note(ARTICLE_RANDOM);
-        article_expression(tree);
-    }
+        article_expression(tree, ARTICLE_RANDOM);
 
     switch(in->lex.code)
     {

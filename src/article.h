@@ -13,8 +13,6 @@ enum article_enum
 
 void article_init();
 
-void article_note(article_enum num);
-
-void article_expression(Tree* tree);
+void article_expression(Tree* tree, article_enum num);
 
 #endif // ARTICLE_H

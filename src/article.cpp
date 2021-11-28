@@ -19,16 +19,17 @@ static FILE* TEX_STREAM = nullptr;
 
 static const char NOTE_BEFORE_DRVTV[]  = "Возьмем для примера несложную производную";
 static const char NOTE_BEFORE_CUTTER[] = "Проведя несколько элементарных выкладок над данным выражением";
-static const char NOTE_RESULT[]        = "получаем довольно очевидный результат";
+static const char NOTE_BEFORE_RESULT[] = "Получаем довольно очевидный результат";
+static const char NOTE_AFTER_RESULT[]  = "Дальнейшие выкладки оставляем читателю в качестве упражнения";
 
 static const char* NOTE_ARR[]  = {
     "Из школьного курса алгебры известно",
     "Из очевидной симметрии",
     "Как известно",
-    "Произвольная ... такая, что...",
-    "Для нахождения ... дважды применим теорему 3.5",
+    "Найдем произвольную функцию такую, что",
+    "Дважды применим теорему 3.5",
     "Из геометрических соображений",
-    "Просто скатав из Корявова",
+    "Тупо скатав из Корявова",
     "Из этого следует",
     "Легко понять",
     "Легко видеть",
@@ -39,7 +40,11 @@ static const char* NOTE_ARR[]  = {
     "Аналогичное рассуждение показывает, что",
     "С другой стороны",
     "Отметим одно очевидное умозаключение, которое часто будет встречаться в дальнейшем",
-    "Дальнейшие выкладки оставляем читателю в качестве упражнения",
+    "По третьему закону Кеплера",
+    "Приводя подобные",
+    "Воспользовавшись алгеброй логики",
+    "Применяя 367 метод Султанова",
+    "Следующее утверждение сразу вытекает из формул (16) \\textsection 4 гл. 1 т.3",
 };
 
 static char TEX_TEMP_FILE[] = "tree_dump/tex_temp.tex";
@@ -170,7 +175,7 @@ static void tex_node_(Node* node, Node* parent)
             tex_node_(node->left, node);
             PRINT("}{");
             tex_node_(node->right, node);
-            PRINT("} ");
+            PRINT("}");
             break;
 
         case LEX_ADD:
@@ -195,7 +200,7 @@ static void tex_node_(Node* node, Node* parent)
             tex_node_(node->left, node);
             PRINT("^{");
             tex_node_(node->right, node);
-            PRINT("} ");
+            PRINT("}");
             break;
 
         #include "reserved_functions.inc"
@@ -219,37 +224,7 @@ static void tex_node_(Node* node, Node* parent)
         PRINT(")'");
 }
 
-void article_note(article_enum num)
-{
-    FILE* stream = TEX_STREAM;
-    if(!stream)
-        return;
-    
-    switch(num)
-    {
-        case ARTICLE_BEFORE_DRVTV:
-            PRINT("%s\n", NOTE_BEFORE_DRVTV);
-            return;
-
-        case ARTICLE_BEFORE_CUTTER:
-            PRINT("%s\n", NOTE_BEFORE_CUTTER);
-            return;
-
-        case ARTICLE_RESULT:
-            PRINT("%s\n", NOTE_RESULT);
-            return;
-            
-        case ARTICLE_RANDOM:
-            num = (article_enum) (rand() % (sizeof(NOTE_ARR) / sizeof(char*)));
-            PRINT("%s\n", NOTE_ARR[num]);
-            return;
-
-        default:
-            assert(0);
-    }
-}
-
-void article_expression(Tree* tree)
+void article_expression(Tree* tree, article_enum num)
 {
     assert(tree);
     assert(tree->root);
@@ -258,18 +233,70 @@ void article_expression(Tree* tree)
     if(stream == nullptr)
         return;
 
-    PRINT("\\begin{equation}\n");
+    switch(num)
+    {
+        case ARTICLE_BEFORE_DRVTV:
+            PRINT("%s\n"
+                  "\\begin{equation}\n"
+                  "(",
+                   NOTE_BEFORE_DRVTV);
 
-    int coin = rand() % 7;
-    if(coin == 0)
-        PRINT("\\rotatebox{180}{$\n");
+            tex_node_(tree->root, nullptr);
 
-    tex_node_(tree->root, nullptr);
+            PRINT(")'\n"
+                  "\\end{equation}\n");
 
-    if(coin == 0)
-        PRINT("$}\n");
+            return;
 
-    PRINT("\\end{equation}\n");
+        case ARTICLE_BEFORE_CUTTER:
+            PRINT("%s\n"
+                  "\\begin{equation}\n",
+                  NOTE_BEFORE_CUTTER);
+
+            tex_node_(tree->root, nullptr);
+
+            PRINT("\n\\end{equation}\n");
+
+            return;
+
+        case ARTICLE_RESULT:
+            PRINT("%s\n"
+                  "\\begin{equation}\n",
+                  NOTE_BEFORE_RESULT);
+
+            tex_node_(tree->root, nullptr);
+
+
+            PRINT("\n\\end{equation}\n"
+                  "%s\n",
+                  NOTE_AFTER_RESULT);
+
+            return;
+            
+        case ARTICLE_RANDOM:
+        {
+            num = (article_enum) (rand() % (sizeof(NOTE_ARR) / sizeof(char*)));
+
+            PRINT("%s\n", NOTE_ARR[num]);
+
+            PRINT("\\begin{equation}\n");
+
+            int coin = rand() % 7;
+            if(coin == 0)
+                PRINT("\\rotatebox{180}{$\n");
+
+            tex_node_(tree->root, nullptr);
+
+            if(coin == 0)
+                PRINT("\n$}\n");
+
+            PRINT("\\end{equation}\n");
+
+            return;
+        }
+        default:
+            assert(0);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

@@ -46,20 +46,17 @@ int main()
     Tree derived_tree = {};
 
     parse(&tree, buffer);
-    tree_dump(&derived_tree, "ORIGINAL_TREE");
+    tree_dump(&tree, "ORIGINAL_TREE");
 
-    article_note(ARTICLE_BEFORE_DRVTV);
-    article_expression(&tree);
+    article_expression(&tree, ARTICLE_BEFORE_DRVTV);
     derivate(&derived_tree, &tree);
     tree_dump(&derived_tree, "DERIVED_TREE");
 
-    article_note(ARTICLE_BEFORE_CUTTER);
-    article_expression(&derived_tree);
+    article_expression(&derived_tree, ARTICLE_BEFORE_CUTTER);
     cutter(&derived_tree);
     tree_dump(&derived_tree, "CUTTED_TREE");
 
-    article_note(ARTICLE_RESULT);
-    article_expression(&derived_tree);
+    article_expression(&derived_tree, ARTICLE_RESULT);
 
     tree_dstr(&tree);
     tree_dstr(&derived_tree);
