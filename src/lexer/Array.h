@@ -24,11 +24,12 @@ struct Array
 
 enum array_err
 {
-    ARRAY_NOERR     = 0,
-    ARRAY_NULLPTR   = 1,
-    ARRAY_BAD_ALLOC = 2,
-    ARRAY_REINIT    = 3,
-    ARRAY_NOTINIT   = 4,
+    ARRAY_NOERR        = 0,
+    ARRAY_NULLPTR      = 1,
+    ARRAY_BAD_ALLOC    = 2,
+    ARRAY_REINIT       = 3,
+    ARRAY_NOTINIT      = 4,
+    ARRAY_CHUNK_OVRFLW = 5,
 };
 
 array_err array_init(Array* arr, size_t main_buffer_sz);

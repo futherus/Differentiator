@@ -83,11 +83,12 @@ array_err array_add(Array* arr, const char** ptr, const char data[], size_t data
 {
     ASSERT(arr && ptr && data, ARRAY_NULLPTR);
 
-    size_t data_len = data_sz;
-    if(data_len == 0)
-        data_len = strlen(data);
+    if(data_sz == 0)
+        data_sz = strlen(data);
 
-    if(arr->cap < arr->size + data_len)
+    ASSERT(data_sz < ARRAY_CHUNK_SIZE, ARRAY_CHUNK_OVRFLW);
+
+    if(arr->cap < arr->size + data_sz)
     {
         size_t prev_cap = arr->cap;
 
@@ -98,11 +99,11 @@ array_err array_add(Array* arr, const char** ptr, const char data[], size_t data
     }
 
     char* new_string = &arr->ptr_arr[arr->size / ARRAY_CHUNK_SIZE][arr->size % ARRAY_CHUNK_SIZE];
-    memcpy(new_string, data, data_len);
-    new_string[data_len] = '\0';
+    memcpy(new_string, data, data_sz);
+    new_string[data_sz] = '\0';
     *ptr = new_string;
 
-    arr->size += (data_len + 1);
+    arr->size += (data_sz + 1);
 
     return ARRAY_NOERR;
 }

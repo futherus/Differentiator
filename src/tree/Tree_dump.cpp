@@ -52,6 +52,9 @@ static char* graphviz_png_()
 #define DEF_FUNC(HASH, NAME)          \
     case(LEX_##NAME):                 \
 
+#define DEF_SUBST(HASH, NAME)         \
+    case(LEX_##NAME):                 \
+
 static void tree_print_node_(Node* node, size_t)
 {
     FILE* stream = TEMP_GRAPH_STREAM;
@@ -84,7 +87,13 @@ static void tree_print_node_(Node* node, size_t)
 
             break;
         }
-        default : case LEX_NOCODE : 
+        #include "../reserved_substitutions.inc"
+        {
+            PRINT("]");
+
+            break;
+        }
+        default : case LEX_NOCODE : case LEX_EOF :
                                     #include "../reserved_parentheses.inc"
         {
             assert(0);

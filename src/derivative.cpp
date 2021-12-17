@@ -1,10 +1,12 @@
 #include <assert.h>
 
-#include "derivative.h"
-#include "article.h"
+#include "differentiator.h"
+#include "hash.h"
 #include "dumpsystem/dumpsystem.h"
 
-#define NUM(BASE_NODE, VAL) PASS$(!tree_add_num(tree, (BASE_NODE), (VAL)), return DRVTV_TREE_FAIL; )
+#define IF_NUM(NUM, NODE) if((NODE)->lex.code == LEX_IMMCONST && abs((NODE)->lex.value.num - (NUM)) < EPSILON)
+
+#define NUM(BASE_NODE, VAL) PASS$(!tree_add_num(tree, (BASE_NODE), (VAL)), return DIFF_TREE_FAIL; )
 
 inline tree_err tree_add_num(Tree* tree, Node** base_node, double val)
 {
@@ -15,7 +17,7 @@ inline tree_err tree_add_num(Tree* tree, Node** base_node, double val)
     return tree_add(tree, base_node, &tmp);
 }
 
-#define RSRVD(BASE_NODE, NAME) PASS$(!tree_add_code(tree, (BASE_NODE), LEX_##NAME), return DRVTV_TREE_FAIL; )
+#define RSRVD(BASE_NODE, NAME) PASS$(!tree_add_code(tree, (BASE_NODE), LEX_##NAME), return DIFF_TREE_FAIL; )
 
 inline tree_err tree_add_code(Tree* tree, Node** base_node, Lexem_code code)
 {
@@ -25,9 +27,9 @@ inline tree_err tree_add_code(Tree* tree, Node** base_node, Lexem_code code)
     return tree_add(tree, base_node, &tmp);
 }
 
-#define MKNODE(BASE_NODE, LEX)  PASS$(!tree_add(tree,  (BASE_NODE), (LEX)),    return DRVTV_TREE_FAIL; )
-#define COPY(BASE_NODE, ORIGIN) PASS$(!tree_copy(tree, (BASE_NODE), (ORIGIN)), return DRVTV_TREE_FAIL; )
-#define DERIV(BASE_NODE, NODE)  PASS$(!derivate_(tree, (BASE_NODE), (NODE)),   return DRVTV_PASS_ERR;  )
+#define MKNODE(BASE_NODE, LEX)  PASS$(!tree_add(tree,  (BASE_NODE), (LEX)),    return DIFF_TREE_FAIL; )
+#define COPY(BASE_NODE, ORIGIN) PASS$(!tree_copy(tree, (BASE_NODE), (ORIGIN)), return DIFF_TREE_FAIL; )
+#define DERIV(BASE_NODE, NODE)  PASS$(!derivate_(tree, (BASE_NODE), (NODE)),   return DIFF_PASS_ERR;  )
 
 #define DEF_OP(SYMB, CODE)            \
     case (LEX_##CODE):                \
@@ -38,14 +40,19 @@ inline tree_err tree_add_code(Tree* tree, Node** base_node, Lexem_code code)
 #define DEF_FUNC(HASH, NAME)          \
     case(LEX_##NAME):                 \
 
-static derivative_err derivate_(Tree* tree, Node** base, Node* in)
+#define DEF_SUBST(HASH, NAME)         \
+    case(LEX_##NAME):                 \
+
+static uint64_t DIFF_VAR_HASH_ = 0;
+
+static diff_err derivate_(Tree* tree, Node** base, Node* in)
 {
     assert(tree && base && in);
 
     //tree_dump(tree, "dump");
     //LOG$("LEX: %s", demangle(&in->lex));
     if(tree->size)
-        article_expression(tree, ARTICLE_RANDOM);
+        article_record(tree, ARTICLE_RANDOM, "f'");
 
     switch(in->lex.code)
     {
@@ -54,9 +61,16 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
             break;
 
         case LEX_VAR:
-            NUM(base, 1);
-            break;
+            if(in->lex.value.hash == DIFF_VAR_HASH_)
+            {
+                NUM(base, 1);
+                break;
+            }
+            
+            MKNODE(base, &in->lex);
+            (*base)->lex.location.head = nullptr;
 
+            break;
         case LEX_ADD : case LEX_SUB :
             MKNODE(base, &in->lex);
 
@@ -83,6 +97,9 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
             break;
 
         case LEX_DIV:
+            IF_NUM(0, (*base)->right)
+                ASSERT_RET$(0, DIFF_INDEFINITE);
+
             RSRVD(base, DIV);
 
             RSRVD(&(*base)->left,  SUB);
@@ -103,6 +120,10 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
             break;
 
         case LEX_POW:
+            IF_NUM(0, (*base)->left)
+                IF_NUM(0, (*base)->right)
+                    ASSERT_RET$(0, DIFF_INDEFINITE);
+
             RSRVD(base, MUL);
 
             COPY(&(*base)->left, in);
@@ -138,10 +159,10 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
         case LEX_cos:
             RSRVD(base, MUL);
 
-            RSRVD(&(*base)->left, SUB);
+            RSRVD(&(*base)->left, MUL);
             (*base)->right = in->left;
 
-            NUM(&(*base)->left->left, 0);
+            NUM(&(*base)->left->left, -1);
 
             RSRVD(&(*base)->left->right, sin);
             
@@ -163,22 +184,30 @@ static derivative_err derivate_(Tree* tree, Node** base, Node* in)
             DERIV(&(*base)->right, in->left);
             break;
             
-        default: case LEX_NOCODE :
+        default: case LEX_NOCODE : case LEX_EOF :
                                     #include "reserved_parentheses.inc"
+                                    #include "reserved_substitutions.inc"
         {   
-            ASSERT$(0, DRVTV_NOTFOUND, assert(0); );
+            ASSERT$(0, DIFF_UNEXPTD_LEX, assert(0); );
         }
     }
 
-    return DRVTV_NOERR;
+    return DIFF_NOERR;
 }
 
-derivative_err derivate(Tree* tree_out, Tree* tree_in)
+#undef DEF_OP
+#undef DEF_PAREN
+#undef DEF_FUNC
+#undef DEF_SUBST
+
+diff_err derivate(Tree* tree_out, Tree* tree_in, const char diff_variable[])
 {
-    ASSERT_RET$(tree_out && tree_in, DRVTV_NULLPTR);
+    ASSERT_RET$(tree_out && tree_in && diff_variable, DIFF_NULLPTR);
     tree_out->root = tree_in->root;
 
-    PASS$(!derivate_(tree_out, &(tree_out->root), tree_in->root), return DRVTV_PASS_ERR; );
+    DIFF_VAR_HASH_ = fnv1_64(diff_variable, strlen(diff_variable));
 
-    return DRVTV_NOERR;
+    PASS$(!derivate_(tree_out, &(tree_out->root), tree_in->root), return DIFF_PASS_ERR; );
+
+    return DIFF_NOERR;
 }

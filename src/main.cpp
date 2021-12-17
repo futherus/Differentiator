@@ -1,15 +1,13 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#include "tree/Tree.h"
-#include "lexer/lexer.h"
-#include "derivative.h"
+#include "differentiator.h"
 #include "parser.h"
 #include "dumpsystem/dumpsystem.h"
-#include "cutter.h"
-#include "article.h"
+#include "jumps.h"
+#include "args.h"
 
-static int file_sz_(const char filename[], size_t* sz)
+static int get_file_sz_(const char filename[], size_t* sz)
 {
     struct stat buff = {};
     if(stat(filename, &buff) == -1)
@@ -20,46 +18,72 @@ static int file_sz_(const char filename[], size_t* sz)
     return 0;
 }
 
-enum differentiator_err
+int main(int argc, char* argv[])
 {
-    DIFFTOR_NOERR = 0,
-    DIFFTOR_READ_FAIL = 1,
-};
+    char infile_name[FILENAME_MAX]   = "";
+    char diff_variable[FILENAME_MAX] = "";
 
-int main()
-{
-    size_t file_size = 0;
-    ASSERT_RET$(!file_sz_("input.txt", &file_size), DIFFTOR_READ_FAIL);
-
-    char* buffer = (char*) calloc(file_size, sizeof(char));
-
-    FILE* instream = fopen("input.txt", "r");
-    ASSERT_RET$(instream, DIFFTOR_READ_FAIL);
-
-    fread(buffer, sizeof(char), file_size, instream);
-    ASSERT_RET$(!ferror(instream), DIFFTOR_READ_FAIL);
-    
-    tree_dump_init(dumpsystem_get_stream(log));
-    article_init();
+    args_msg msg = process_args(argc, argv, infile_name, diff_variable);
+    if(msg)
+    {
+        response_args(msg);
+        return DIFF_NOERR;
+    }
 
     Tree tree = {};
-    Tree derived_tree = {};
+    Tree diff_tree = {};
 
-    parse(&tree, buffer);
-    tree_dump(&tree, "ORIGINAL_TREE");
+    size_t file_sz = 0;
+    FILE* instream = nullptr;
+    char* buffer   = nullptr;
 
-    article_expression(&tree, ARTICLE_BEFORE_DRVTV);
-    derivate(&derived_tree, &tree);
-    tree_dump(&derived_tree, "DERIVED_TREE");
+    tree_dump_init(dumpsystem_get_stream(log));
+    article_init(diff_variable);
 
-    article_expression(&derived_tree, ARTICLE_BEFORE_CUTTER);
-    cutter(&derived_tree);
-    tree_dump(&derived_tree, "CUTTED_TREE");
+TRY__
+    ASSERT$(!get_file_sz_(infile_name, &file_sz),     DIFF_READ_FAIL, FAIL__);
 
-    article_expression(&derived_tree, ARTICLE_RESULT);
+    buffer = (char*) calloc(file_sz, sizeof(char));
+    ASSERT$(buffer,                                   DIFF_BAD_ALLOC, FAIL__);
 
+    instream = fopen(infile_name, "r");
+    ASSERT$(instream,                                 DIFF_READ_FAIL, FAIL__);
+
+    file_sz = fread(buffer, sizeof(char), file_sz, instream);
+    ASSERT$(!ferror(instream),                        DIFF_READ_FAIL, FAIL__);
+    
+    fclose(instream);
+
+    buffer = (char*) realloc(buffer, file_sz * sizeof(char));
+    ASSERT$(buffer,                                   DIFF_READ_FAIL, FAIL__);
+
+    PASS$(!lexer_init(buffer, file_sz), FAIL__);
+
+    PASS$(!parse(&tree),                FAIL__);
+    tree_dump(&tree, "INITIAL_TREE");
+
+    PASS$(!article_record(&tree, ARTICLE_BEFORE_CUTTER, "f"), FAIL__);
+    PASS$(!cutter(&tree),                                     FAIL__);
+    tree_dump(&tree, "CUTTED_TREE");
+    
+    PASS$(!article_record(&tree, ARTICLE_BEFORE_DRVTV, "f"),  FAIL__);
+    PASS$(!derivate(&diff_tree, &tree, diff_variable),        FAIL__);
+    tree_dump(&diff_tree, "DERIVED_TREE");
+
+    PASS$(!article_record(&diff_tree, ARTICLE_BEFORE_CUTTER, "f'"), FAIL__);
+    PASS$(!cutter(&diff_tree),                                      FAIL__);
+    tree_dump(&diff_tree, "CUTTED_TREE");
+
+    PASS$(!article_record(&diff_tree, ARTICLE_RESULT, "f'"),        FAIL__);
+
+CATCH__
+    free(buffer);
     tree_dstr(&tree);
-    tree_dstr(&derived_tree);
+    tree_dstr(&diff_tree);
+    lexer_dstr();
 
-    return 0;
+FINALLY__
+    return DIFF_NOERR;
+
+ENDTRY__
 }

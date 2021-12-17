@@ -9,14 +9,14 @@
 #include "../dumpsystem/dumpsystem.h"
 #include "Array.h"
 
-static Stack HASH_PTR_STK = {};
-static Array STR_ARR      = {};
+static Stack HASH_NAME_STK = {};
+static Array NAME_ARR      = {};
 
 static const char* find_name_(uint64_t hash)
 {
-    const uint64_t* ptr = (uint64_t*) HASH_PTR_STK.buffer;
+    const uint64_t* ptr = (uint64_t*) HASH_NAME_STK.buffer;
 
-    for(size_t iter = 0; iter < HASH_PTR_STK.size; iter += 2)
+    for(size_t iter = 0; iter < HASH_NAME_STK.size; iter += 2)
     {
         if(*(ptr + iter) == hash)
             return (const char*) *(ptr + iter + 1);
@@ -25,18 +25,18 @@ static const char* find_name_(uint64_t hash)
     return nullptr;
 }
 
-static lexer_err add_new_name_(const char* name, size_t name_sz, uint64_t hash)
+lexer_err add_new_name(const char* name, size_t name_sz, uint64_t hash)
 {
-    assert(name);
+    ASSERT_RET$(name, LEXER_NULLPTR);
 
     if(find_name_(hash))
-        return LEXER_NOERR;
+        return LEXER_NAME_EXISTS;
     
     const char* new_str = nullptr;
-    ASSERT_RET$(!array_add(&STR_ARR, &new_str, name, name_sz),  LEXER_ARRAY_FAIL);
+    ASSERT_RET$(!array_add(&NAME_ARR, &new_str, name, name_sz),  LEXER_ARRAY_FAIL);
 
-    ASSERT_RET$(!stack_push(&HASH_PTR_STK, hash),               LEXER_STACK_FAIL);
-    ASSERT_RET$(!stack_push(&HASH_PTR_STK, (uint64_t) new_str), LEXER_STACK_FAIL);
+    ASSERT_RET$(!stack_push(&HASH_NAME_STK, hash),               LEXER_STACK_FAIL);
+    ASSERT_RET$(!stack_push(&HASH_NAME_STK, (uint64_t) new_str), LEXER_STACK_FAIL);
 
     return LEXER_NOERR;
 }
@@ -57,34 +57,40 @@ static void wordlen_(char* ptr, int* n_read)
         (*n_read)++;
 }
 
-#define DEF_OP(SYMB, CODE)                    \
-    case (SYMB):                              \
-        TMP_LEX_.code = LEX_##CODE;           \
-        IS_TMP_LEX_ = true;                   \
-        pos += 1;                             \
-        return LEXER_NOERR;                   \
+#define DEF_OP(SYMB, CODE)          \
+    case (SYMB):                    \
+        TMP_LEX_.code = LEX_##CODE; \
+        IS_TMP_LEX_ = true;         \
+        pos += 1;                   \
+        return LEXER_NOERR;         \
 
-#define DEF_PAREN(SYMB, CODE)                 \
-    case (SYMB):                              \
-        TMP_LEX_.code = LEX_##CODE;           \
-        IS_TMP_LEX_ = true;                   \
-        pos += 1;                             \
-        return LEXER_NOERR;                   \
+#define DEF_PAREN(SYMB, CODE)       \
+    case (SYMB):                    \
+        TMP_LEX_.code = LEX_##CODE; \
+        IS_TMP_LEX_ = true;         \
+        pos += 1;                   \
+        return LEXER_NOERR;         \
 
-#define DEF_FUNC(HASH, NAME)                  \
-    case (HASH):                              \
-        TMP_LEX_.code = LEX_##NAME;           \
-        IS_TMP_LEX_ = true;                   \
-        pos += n_read;                        \
-        return LEXER_NOERR;                   \
+#define DEF_FUNC(HASH, NAME)        \
+    case (HASH):                    \
+        TMP_LEX_.code = LEX_##NAME; \
+        IS_TMP_LEX_ = true;         \
+        pos += n_read;              \
+        return LEXER_NOERR;         \
+
+#define DEF_SUBST(HASH, NAME)       \
+    case (HASH):                    \
 
 static Lexem TMP_LEX_    = {};
 static bool  IS_TMP_LEX_ = false;
+static size_t DATA_SZ_   = 0;
 
 static lexer_err lexer_(char* data)
 {
     static char*  txt = nullptr;
     static size_t pos = 0;
+
+    ASSERT_RET$(txt || data, LEXER_NULLPTR);
 
     if(data)
     {
@@ -97,6 +103,13 @@ static lexer_err lexer_(char* data)
     clean_whitespaces_(txt, &pos);
 
     TMP_LEX_.location.pos = pos;
+
+    if(pos == DATA_SZ_)
+    {
+        TMP_LEX_.code = LEX_EOF;
+        TMP_LEX_.value.hash = 0;
+        return LEXER_NOERR;
+    }
     
     int n_read = 0;
 
@@ -128,6 +141,9 @@ static lexer_err lexer_(char* data)
     {
         #include "../reserved_functions.inc"
         
+        #include "../reserved_substitutions.inc"
+            ASSERT_RET$(0, LEXER_RESERVED_NAMES);
+
         default:
         { /*fallthrough*/ }
     }
@@ -136,7 +152,8 @@ static lexer_err lexer_(char* data)
     IS_TMP_LEX_         = true;
     TMP_LEX_.value.hash = hash;
 
-    PASS$(!add_new_name_(txt + pos, n_read, hash), return LEXER_PASS_ERR; );
+    lexer_err err = add_new_name(txt + pos, n_read, hash);
+    PASS$(err == LEXER_NOERR || err == LEXER_NAME_EXISTS, return err; );
 
     pos += n_read;
 
@@ -146,13 +163,37 @@ static lexer_err lexer_(char* data)
 #undef DEF_OP
 #undef DEF_PAREN
 #undef DEF_FUNC
+#undef DEF_SUBST
 
-lexer_err lexer(char* data)
+lexer_err lexer_init(char* data, size_t data_sz)
 {
-    ASSERT_RET$(!stack_init(&HASH_PTR_STK, 0), LEXER_STACK_FAIL);
-    ASSERT_RET$(!array_init(&STR_ARR, 0),      LEXER_ARRAY_FAIL);
+    ASSERT_RET$(data, LEXER_NULLPTR);
+    ASSERT_RET$(data_sz > 0, LEXER_EMPTY_DATA);
+
+    ASSERT_RET$(!stack_init(&HASH_NAME_STK, 0), LEXER_STACK_FAIL);
+    ASSERT_RET$(!array_init(&NAME_ARR, 0),      LEXER_ARRAY_FAIL);
+
+    DATA_SZ_ = data_sz;
 
     return lexer_(data);
+}
+
+lexer_err lexer_dstr()
+{
+    if(HASH_NAME_STK.buffer == nullptr && NAME_ARR.main_buffer == nullptr)
+        return LEXER_NOERR;
+
+    stack_dstr(&HASH_NAME_STK);
+    array_dstr(&NAME_ARR);
+
+    HASH_NAME_STK = {};
+    NAME_ARR = {};
+
+    IS_TMP_LEX_ = false;
+    TMP_LEX_ = {};
+    DATA_SZ_ = 0;
+
+    return LEXER_NOERR;
 }
 
 lexer_err consume(Lexem* lex)
@@ -180,26 +221,37 @@ lexer_err peek(Lexem* lex)
     return LEXER_NOERR;
 }
 
-#define DEF_OP(SYMB, CODE)            \
-    case (LEX_##CODE):                \
+#define DEF_OP(SYMB, CODE)              \
+    case (LEX_##CODE):                  \
 
-#define DEF_PAREN(SYMB, CODE)         \
-    case (LEX_##CODE):                \
+#define DEF_PAREN(SYMB, CODE)           \
+    case (LEX_##CODE):                  \
 
-#define DEF_FUNC(HASH, NAME)          \
-    case(LEX_##NAME):                 \
-        sprintf(buffer, "%s", #NAME); \
-        break;                        \
+#define DEF_FUNC(HASH, NAME)            \
+    case(LEX_##NAME):                   \
+        sprintf(buffer, "\\%s", #NAME);   \
+        break;                          \
+
+#define DEF_SUBST(HASH, NAME)           \
+    case(LEX_##NAME):                   \
+        sprintf(buffer, "\\%s", #NAME); \
+        break;                          \
 
 char* demangle(const Lexem* lex)
 {
+    assert(lex);
+
     static char buffer[1000] = "";
 
     switch(lex->code)
     {
         case LEX_IMMCONST:
         {
-            sprintf(buffer, "%lg", lex->value.num);
+            if(lex->value.num < 0)
+                sprintf(buffer, "(%lg)", lex->value.num);
+            else
+                sprintf(buffer, "%lg", lex->value.num);
+
             break;
         }
         case LEX_VAR:
@@ -222,7 +274,9 @@ char* demangle(const Lexem* lex)
 
         #include "../reserved_functions.inc"
 
-        default : case LEX_NOCODE :
+        #include "../reserved_substitutions.inc"
+
+        default : case LEX_NOCODE : case LEX_EOF :
             ASSERT$(0, LEXER_NOTFOUND, assert(0); );
             break;
     }
@@ -233,3 +287,4 @@ char* demangle(const Lexem* lex)
 #undef DEF_OP
 #undef DEF_PAREN
 #undef DEF_FUNC
+#undef DEF_SUBST

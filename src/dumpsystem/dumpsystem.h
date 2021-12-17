@@ -44,7 +44,7 @@ const int DUMPSYSTEM_DEFAULT_STREAM = 1;
                                                                                       \
             {ACTION__}                                                                \
         }                                                                             \
-    } while(0)
+    } while(0)                                                                        \
 
 #define LOG$(MESSAGE__, ...)                                                          \
     {                                                                                 \

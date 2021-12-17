@@ -59,7 +59,6 @@ static tree_err add_chunk_(Tree* tree)
 tree_err tree_dstr(Tree* tree)
 {
     ASSERT(tree, TREE_NULLPTR);
-    ASSERT(tree->ptr_arr, TREE_NOTINIT);
 
     for(ptrdiff_t iter = 0; iter < tree->cap / TREE_CHUNK_SIZE; iter++)
         free(tree->ptr_arr[iter]);

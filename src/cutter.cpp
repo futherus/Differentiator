@@ -1,13 +1,12 @@
 #include <math.h>
 #include <assert.h>
 
-#include "tree/Tree.h"
-#include "cutter.h"
+#include "differentiator.h"
 #include "dumpsystem/dumpsystem.h"
 
 static int OPT_STATE = 0;
 
-#define IF_NUM(NUM, LEX) if((LEX).code == LEX_IMMCONST && (LEX).value.num == (NUM))
+#define IF_NUM(NUM, LEX) if((LEX).code == LEX_IMMCONST && abs((LEX).value.num - (NUM)) < EPSILON)
 
 static void cut_add_(Node** node)
 {
@@ -72,35 +71,45 @@ static void cut_mul_(Node** node)
     }
 }
 
-static void cut_div_(Node** node)
+static diff_err cut_div_(Node** node)
 {
     assert(node);
 
+    IF_NUM(0, (*node)->right->lex)
+        ASSERT_RET$(0, DIFF_INDEFINITE);
+
     IF_NUM(1, (*node)->right->lex)
     {
-        *node = (*node)->right;
+        *node = (*node)->left;
         OPT_STATE = 1;
     }
+
+    return DIFF_NOERR;
 }
 
-static void cut_pow_(Node** node)
+static diff_err cut_pow_(Node** node)
 {
     assert(node);
 
     IF_NUM(0, (*node)->right->lex)
     {
+        IF_NUM(0, (*node)->left->lex)
+            ASSERT_RET$(0, DIFF_INDEFINITE);
+
         *node = (*node)->right;
         (*node)->lex.value.num = 1;
         OPT_STATE = 1;
-        return;
+        return DIFF_NOERR;
     }
 
     IF_NUM(1, (*node)->right->lex)
     {
         *node = (*node)->left;
         OPT_STATE = 1;
-        return;
+        return DIFF_NOERR;
     }
+
+    return DIFF_NOERR;
 }
 
 #define DEF_OP(SYMB, CODE)            \
@@ -110,9 +119,12 @@ static void cut_pow_(Node** node)
     case (LEX_##CODE):                \
 
 #define DEF_FUNC(HASH, NAME)          \
-    case(LEX_##NAME):                 \
+    case (LEX_##NAME):                \
 
-static int cut_zero_one_(Node** node)
+#define DEF_SUBST(HASH, NAME)         \
+    case (LEX_##NAME):                \
+
+static diff_err cut_zero_one_(Node** node)
 {
     assert(node);
 
@@ -137,11 +149,11 @@ static int cut_zero_one_(Node** node)
             break;
             
         case LEX_POW:
-            cut_pow_(node);
+            PASS$(!cut_pow_(node), return DIFF_UNEXPTD_LEX; );
             break;
 
         case LEX_DIV:
-            cut_div_(node);
+            PASS$(!cut_div_(node), return DIFF_UNEXPTD_LEX; );
             break;
 
         case LEX_IMMCONST : case LEX_VAR :
@@ -150,22 +162,23 @@ static int cut_zero_one_(Node** node)
             break;
         }
 
-        default : case LEX_NOCODE :
+        default : case LEX_NOCODE : case LEX_EOF :
                 #include "reserved_parentheses.inc"
+                #include "reserved_substitutions.inc"
         {
-            return 1;
+            ASSERT_RET$(0, DIFF_UNEXPTD_LEX);
         }
     }
 
-    return 0;
+    return DIFF_NOERR;
 }
 
-static int evaluate_operator_(Node* node)
+static diff_err evaluate_operator_(Node* node)
 {
     assert(node);
 
     if(node->left->lex.code != LEX_IMMCONST || node->right->lex.code != LEX_IMMCONST)
-        return 0;
+        return DIFF_NOERR;
 
     double left   = node->left->lex.value.num;
     double right  = node->right->lex.value.num;
@@ -192,12 +205,13 @@ static int evaluate_operator_(Node* node)
         case LEX_POW:
             result = pow(left, right);
             break;
-        
-        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE :
-                #include "reserved_parentheses.inc"
+
+        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE : case LEX_EOF :
                 #include "reserved_functions.inc"
+                #include "reserved_parentheses.inc"
+                #include "reserved_substitutions.inc"
         {
-            return 1;
+            ASSERT_RET$(0, DIFF_UNEXPTD_LEX);
         }
     }
 
@@ -207,15 +221,15 @@ static int evaluate_operator_(Node* node)
     node->lex.value.num = result;
     OPT_STATE = 1;
 
-    return 0;
+    return DIFF_NOERR;
 }
 
-static int evaluate_function_(Node* node)
+static diff_err evaluate_function_(Node* node)
 {
     assert(node);
 
     if(node->left->lex.code != LEX_IMMCONST)
-        return 0;
+        return DIFF_NOERR;
     
     double left   = node->left->lex.value.num;
     double result = 0;
@@ -233,11 +247,12 @@ static int evaluate_function_(Node* node)
             result = log(left);
             break;
 
-        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE :
+        default : case LEX_IMMCONST : case LEX_VAR : case LEX_NOCODE : case LEX_EOF :
                 #include "reserved_parentheses.inc"
                 #include "reserved_operators.inc"
+                #include "reserved_substitutions.inc"
         {
-            return 1;
+            ASSERT_RET$(0, DIFF_UNEXPTD_LEX);
         }
     }
 
@@ -247,44 +262,47 @@ static int evaluate_function_(Node* node)
     node->lex.value.num = result;
     OPT_STATE = 1;
 
-    return 0;
+    return DIFF_NOERR;
 }
 
 #undef DEF_OP
 #undef DEF_PAREN
 #undef DEF_FUNC
+#undef DEF_SUBST
 
-static int const_evaluation_(Node* node)
+static diff_err const_evaluation_(Node* node)
 {
     assert(node);
 
-    int ret = 0;
-
     if(node->left)
-        const_evaluation_(node->left);
+        PASS$(!const_evaluation_(node->left), return DIFF_PASS_ERR; );
     
     if(node->right)
-        const_evaluation_(node->right);
+        PASS$(!const_evaluation_(node->right), return DIFF_PASS_ERR; );
 
     if(node->left)
-        ret = evaluate_function_(node);
+    {
+        if(node->right)
+            PASS$(!evaluate_operator_(node), return DIFF_UNEXPTD_LEX; );
+        else
+            PASS$(!evaluate_function_(node), return DIFF_UNEXPTD_LEX; );
+    }
 
-    if(node->left && node->right)
-        ret = ret && evaluate_operator_(node);
-
-    return ret;
+    return DIFF_NOERR;
 }
 
-void cutter(Tree* tree)
+diff_err cutter(Tree* tree)
 {
-    assert(tree);
+    ASSERT_RET$(tree, DIFF_NULLPTR);
 
     OPT_STATE = 1;
 
     while(OPT_STATE)
     {
         OPT_STATE = 0;
-        ASSERT$(!const_evaluation_(tree->root), UNKNWN_LEXEM, assert(0); );
-        ASSERT$(!cut_zero_one_(&tree->root),    UNKNWN_LEXEM, assert(0); );
+        PASS$(!const_evaluation_(tree->root), return DIFF_UNEXPTD_LEX; );
+        PASS$(!cut_zero_one_(&tree->root),    return DIFF_UNEXPTD_LEX; );
     }
+
+    return DIFF_NOERR;
 }
